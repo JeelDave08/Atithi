@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "18265070121",
+    "project_id": "atithi-app-48314",
+    "storage_bucket": "atithi-app-48314.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:18265070121:android:d7ddf6628c589238a11a38",
+        "android_client_info": {
+          "package_name": "com.example.atithi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "18265070121-drt4ch1kdvhpaei5tr5nm7neolp7h66n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2nR8AoONZ9aLgJwBwhTb7w35s7KJe6Yw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "18265070121-drt4ch1kdvhpaei5tr5nm7neolp7h66n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
