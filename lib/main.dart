@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'auth/auth_repository.dart';
-import 'screens/splash_screen.dart';
+import 'splash/atithi_splash.dart';
+import 'screens/login_screen.dart';
 import 'theme/app_colors.dart';
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(const AtithiApp());
@@ -19,6 +22,7 @@ class AtithiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Atithi',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -60,7 +64,15 @@ class AtithiApp extends StatelessWidget {
           ),
         ),
       ),
-      home: AtithiSplashScreen(authRepository: authRepository),
+      home: AtithiSplashScreen(
+        onFinished: () {
+          _navigatorKey.currentState!.pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => LoginScreen(authRepository: authRepository),
+            ),
+          );
+        },
+      ),
     );
   }
 }

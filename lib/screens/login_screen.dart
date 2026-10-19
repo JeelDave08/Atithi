@@ -5,6 +5,7 @@ import '../auth/auth_repository.dart';
 import '../theme/app_colors.dart';
 import '../widgets/atithi_text_field.dart';
 import '../widgets/auth_components.dart';
+import '../widgets/atithi_round_logo.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -91,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: AtithiBrand()),
+          const Center(child: AtithiRoundLogo(size: 150)),
           const SizedBox(height: 38),
           const AuthHeading(
             title: 'Welcome Back',
@@ -128,18 +129,29 @@ class _LoginScreenState extends State<LoginScreen> {
           Row(
             children: [
               Expanded(
-                child: CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
-                    'Remember me',
-                    style: TextStyle(fontSize: 14, color: AppColors.navy),
-                  ),
-                  value: _rememberMe,
-                  activeColor: AppColors.navy,
-                  visualDensity: VisualDensity.compact,
-                  onChanged: (value) =>
-                      setState(() => _rememberMe = value ?? false),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      activeColor: AppColors.navy,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (value) =>
+                          setState(() => _rememberMe = value ?? false),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Remember me',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.navy,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               TextButton(
@@ -151,12 +163,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.navy,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  foregroundColor: const Color(0xFF1B2A4A),
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text(
                   'Forgot Password?',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1B2A4A),
+                  ),
                 ),
               ),
             ],

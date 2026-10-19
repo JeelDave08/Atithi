@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth_repository.dart';
 import '../widgets/atithi_text_field.dart';
 import '../widgets/auth_components.dart';
+import '../widgets/atithi_round_logo.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({
@@ -63,7 +64,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Center(child: AtithiBrand()),
+          const Center(child: AtithiRoundLogo(size: 150)),
           const SizedBox(height: 38),
           const AuthHeading(
             title: 'Reset Your Password',

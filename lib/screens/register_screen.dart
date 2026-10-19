@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
@@ -5,6 +6,8 @@ import '../auth/auth_repository.dart';
 import '../theme/app_colors.dart';
 import '../widgets/atithi_text_field.dart';
 import '../widgets/auth_components.dart';
+import '../widgets/atithi_round_logo.dart';
+import 'terms_and_conditions_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
@@ -29,9 +32,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _acceptedTerms = false;
   bool _termsError = false;
   bool _isSubmitting = false;
+  late final TapGestureRecognizer _termsRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsRecognizer = TapGestureRecognizer()..onTap = _openTerms;
+  }
+
+  Future<void> _openTerms() async {
+    final agreed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => const TermsAndConditionsScreen(),
+      ),
+    );
+    if (agreed == true && mounted) {
+      setState(() {
+        _acceptedTerms = true;
+        _termsError = false;
+      });
+    }
+  }
+
+  void _toggleTerms() {
+    if (_isSubmitting) return;
+    setState(() {
+      _acceptedTerms = !_acceptedTerms;
+      if (_acceptedTerms) _termsError = false;
+    });
+  }
 
   @override
   void dispose() {
+    _termsRecognizer.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _mobileController.dispose();
@@ -126,7 +160,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: AtithiBrand()),
+          const Center(child: AtithiRoundLogo(size: 150)),
           const SizedBox(height: 30),
           const AuthHeading(
             title: 'Create Your Account',
@@ -236,24 +270,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: _acceptedTerms,
-            activeColor: AppColors.navy,
-            visualDensity: VisualDensity.compact,
-            onChanged: _isSubmitting
-                ? null
-                : (value) {
-                    setState(() {
-                      _acceptedTerms = value ?? false;
-                      if (_acceptedTerms) _termsError = false;
-                    });
-                  },
-            title: const Text(
-              'I agree to the Terms and Conditions',
-              style: TextStyle(color: AppColors.navy, fontSize: 14),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Checkbox(
+                value: _acceptedTerms,
+                activeColor: AppColors.navy,
+                visualDensity: VisualDensity.compact,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _acceptedTerms = value ?? false;
+                          if (_acceptedTerms) _termsError = false;
+                        });
+                      },
+              ),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _toggleTerms,
+                  child: Text.rich(
+                    TextSpan(
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14,
+                      ),
+                      children: [
+                        const TextSpan(text: 'I agree to the '),
+                        TextSpan(
+                          text: 'Terms and Conditions',
+                          style: const TextStyle(
+                            color: Color(0xFFC8924B),
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: _termsRecognizer,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           if (_termsError)
             const Padding(

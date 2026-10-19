@@ -39,21 +39,6 @@ class AuthPageShell extends StatelessWidget {
   }
 }
 
-class AtithiBrand extends StatelessWidget {
-  const AtithiBrand({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/atithi_logo.jpeg',
-      width: 176,
-      height: 176,
-      fit: BoxFit.contain,
-      semanticLabel: 'Atithi — Better Stays. Happier Guests.',
-    );
-  }
-}
-
 class AuthHeading extends StatelessWidget {
   const AuthHeading({required this.title, required this.subtitle, super.key});
 

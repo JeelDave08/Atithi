@@ -30,12 +30,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  go_router: ^16.2.0
+  flutter_riverpod: ^2.6.1
+  google_fonts: ^6.3.0
+  cached_network_image: ^3.4.1
+  shared_preferences: ^2.5.3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   phone_numbers_parser: ^9.0.28
   flutter_svg: ^2.3.0
+  flutter_native_splash: ^2.4.8
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +67,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/splash_logo.png
+    - assets/splash_logo_android12.png
+    - assets/icon/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -94,9 +103,24 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 flutter_launcher_icons:
-  android: true
-  image_path: assets/images/atithi_mark.png
-  adaptive_icon_background: "#FEFBF4"
-  adaptive_icon_foreground: assets/images/atithi_mark.png
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#F5F0E4"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
   adaptive_icon_foreground_inset: 0
+  remove_alpha_ios: true
   min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#F5F0E4"
+  image: assets/splash_logo.png
+  android: true
+  ios: true
+  fullscreen: true
+  web: false
+  android_12:
+    color: "#F5F0E4"
+    image: assets/splash_logo_android12.png
+    icon_background_color: "#F5F0E4"
