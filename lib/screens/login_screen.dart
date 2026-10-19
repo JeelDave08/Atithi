@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/auth_repository.dart';
 import '../theme/app_colors.dart';
@@ -11,7 +12,7 @@ import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
-    this.authRepository = const UnconfiguredAuthRepository(),
+    this.authRepository = const AuthService(),
     super.key,
   });
 
@@ -30,6 +31,16 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _googleSignInPending = false;
 
   @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((preferences) {
+      if (mounted) {
+        setState(() => _rememberMe = preferences.getBool('atithi_remember_me') ?? true);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -38,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return 'Please enter your password.';
+    if (value.length < 6) return 'Use at least 6 characters.';
     return null;
   }
 

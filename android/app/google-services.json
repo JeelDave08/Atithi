@@ -29,6 +29,13 @@
             {
               "client_id": "18265070121-drt4ch1kdvhpaei5tr5nm7neolp7h66n.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "18265070121-j3gbie6o6bhql3h8o2nkp3ki1ecl7eag.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.atithi"
+              }
             }
           ]
         }

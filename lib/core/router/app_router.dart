@@ -11,7 +11,7 @@ import '../../features/availability/availability_screen.dart';
 import '../../features/splash/splash_screen.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => MockAuthRepository(),
+  (ref) => FirebaseAuthRepository(),
 );
 final propertyRepositoryProvider = Provider<PropertyRepository>(
   (ref) => MockPropertyRepository(),

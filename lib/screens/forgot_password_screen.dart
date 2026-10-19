@@ -7,7 +7,7 @@ import '../widgets/atithi_round_logo.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({
-    this.authRepository = const UnconfiguredAuthRepository(),
+    this.authRepository = const AuthService(),
     super.key,
   });
 
@@ -33,9 +33,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (_isSubmitting || !_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
     try {
-      await widget.authRepository.sendPasswordReset(
-        email: _emailController.text.trim(),
-      );
+      await widget.authRepository.sendPasswordReset(_emailController.text.trim());
       if (!mounted) return;
       showAuthMessage(
         context,
@@ -68,7 +66,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           const SizedBox(height: 38),
           const AuthHeading(
             title: 'Reset Your Password',
-            subtitle: 'Enter the email address linked to your account. We will use it to send password reset instructions once email authentication is connected.',
+            subtitle: 'Enter the email address linked to your account. We will send password reset instructions if an account exists.',
           ),
           const SizedBox(height: 27),
           Form(

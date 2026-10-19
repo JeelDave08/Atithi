@@ -173,7 +173,6 @@ String? validateEmailAddress(String? value) {
 
 String authFailureMessage(AuthFailure failure) {
   return switch (failure.code) {
-    AuthFailureCode.configurationMissing => failure.message,
     AuthFailureCode.invalidCredentials => 'Email or password is incorrect.',
     AuthFailureCode.emailAlreadyInUse =>
       'This email is already registered. Try signing in instead.',

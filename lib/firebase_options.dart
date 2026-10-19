@@ -57,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'atithi-app-48314',
     storageBucket: 'atithi-app-48314.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDJjf59ca_No1KUJ025OLK9o_s4i7-OCZU',
     appId: '1:18265070121:ios:4c9831052297235ba11a38',

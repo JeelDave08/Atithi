@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'auth/auth_repository.dart';
-import 'splash/atithi_splash.dart';
+import 'firebase_options.dart';
+import 'features/home/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_colors.dart';
 
-final _navigatorKey = GlobalKey<NavigatorState>();
-
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const AtithiApp());
 }
 
 class AtithiApp extends StatelessWidget {
   const AtithiApp({
-    this.authRepository = const UnconfiguredAuthRepository(),
+    this.authRepository = const AuthService(),
     super.key,
   });
 
@@ -22,7 +26,6 @@ class AtithiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: _navigatorKey,
       title: 'Atithi',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -64,13 +67,16 @@ class AtithiApp extends StatelessWidget {
           ),
         ),
       ),
-      home: AtithiSplashScreen(
-        onFinished: () {
-          _navigatorKey.currentState!.pushReplacement(
-            MaterialPageRoute<void>(
-              builder: (_) => LoginScreen(authRepository: authRepository),
-            ),
-          );
+      home: StreamBuilder(
+        stream: authRepository.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData) return const HomeScreen();
+          return LoginScreen(authRepository: authRepository);
         },
       ),
     );

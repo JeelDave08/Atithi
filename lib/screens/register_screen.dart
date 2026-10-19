@@ -11,7 +11,7 @@ import 'terms_and_conditions_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
-    this.authRepository = const UnconfiguredAuthRepository(),
+    this.authRepository = const AuthService(),
     super.key,
   });
 
@@ -105,12 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return 'Please create a password.';
-    if (value.length < 8) return 'Use at least 8 characters.';
-    if (!RegExp(r'[A-Z]').hasMatch(value) ||
-        !RegExp(r'[a-z]').hasMatch(value) ||
-        !RegExp(r'\d').hasMatch(value)) {
-      return 'Include an uppercase letter, a lowercase letter, and a number.';
-    }
+    if (value.length < 6) return 'Use at least 6 characters.';
     return null;
   }
 
@@ -141,6 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fullName: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phoneNumber: parsedPhone.international,
+        countryCode: country.dialCode,
         password: _passwordController.text,
       );
       if (!mounted) return;
