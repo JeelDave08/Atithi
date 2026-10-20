@@ -1,123 +1,120 @@
-import 'package:flutter/material.dart';
-
-import '../data/terms_content.dart';
-
-const _cream = Color(0xFFF5F0E4);
-const _navy = Color(0xFF1B2A4A);
-const _bodyColor = Color(0xFF566176);
-
-class TermsAndConditionsScreen extends StatelessWidget {
-  const TermsAndConditionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _cream,
-      appBar: AppBar(
-        backgroundColor: _cream,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: _navy),
-        title: const Text(
-          termsAppBarTitle,
-          style: TextStyle(color: _navy, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: Scrollbar(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                termsPageHeading,
-                style: TextStyle(
-                  color: _navy,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                termsLastUpdated,
-                style: TextStyle(color: _bodyColor, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                termsIntroduction,
-                style: TextStyle(color: _bodyColor, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              for (var i = 0; i < termsContent.length; i++) ...[
-                Text(
-                  '${i + 1}. ${termsContent[i].title}',
-                  style: const TextStyle(
-                    color: _navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  termsContent[i].body,
-                  style: const TextStyle(color: _bodyColor, height: 1.5),
-                ),
-                const SizedBox(height: 18),
-              ],
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _navy,
-                      side: const BorderSide(color: _navy),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    child: const Text(termsCloseLabel),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _navy,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    child: const Text(termsAgreeLabel),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+import 'package:flutter/material.dart';
+
+import '../data/terms_content.dart';
+import '../theme/app_colors.dart';
+import '../widgets/atithi_logo.dart';
+import '../widgets/auth_components.dart';
+
+class TermsAndConditionsScreen extends StatefulWidget {
+  const TermsAndConditionsScreen({super.key});
+  @override
+  State<TermsAndConditionsScreen> createState() =>
+      _TermsAndConditionsScreenState();
+}
+
+class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
+  bool _accepted = false;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.navy,
+    appBar: AppBar(
+      backgroundColor: AppColors.navy,
+      foregroundColor: AppColors.cream,
+      elevation: 0,
+      title: const Text(
+        'Terms & Conditions',
+        style: TextStyle(
+          color: AppColors.cream,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+    body: SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          Expanded(
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(child: AtithiLogo(size: 132)),
+                    const SizedBox(height: 18),
+                    const Text(
+                      termsPageHeading,
+                      style: TextStyle(
+                        color: AppColors.cream,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      termsLastUpdated,
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      termsIntroduction,
+                      style: TextStyle(color: AppColors.muted, height: 1.55),
+                    ),
+                    const SizedBox(height: 22),
+                    for (var i = 0; i < termsContent.length; i++) ...[
+                      Text(
+                        (i + 1).toString() + '. ' + termsContent[i].title,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        termsContent[i].body,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          height: 1.55,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
+            child: Column(
+              children: [
+                CheckboxListTile(
+                  value: _accepted,
+                  onChanged: (value) =>
+                      setState(() => _accepted = value ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: AppColors.gold,
+                  checkColor: AppColors.navy,
+                  title: const Text(
+                    'I agree to the Terms & Conditions',
+                    style: TextStyle(color: AppColors.cream, fontSize: 14),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                AuthPrimaryButton(
+                  label: 'I Agree & Create Account',
+                  onPressed: _accepted
+                      ? () => Navigator.pop(context, true)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}

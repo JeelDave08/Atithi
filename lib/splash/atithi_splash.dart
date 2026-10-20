@@ -3,13 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import '../widgets/atithi_logo.dart';
+
 const Color atithiNavy = Color(0xFF1B2A4A);
 const Color atithiGold = Color(0xFFC8924B);
 const Color atithiCream = Color(0xFFF5F0E4);
 const Color atithiWindowGlow = Color(0xFFFFE2A8);
 const Color atithiSkin = Color(0xFFF2C29B);
 const Color atithiBagBrown = Color(0xFF7A4B2A);
-const bool kShowLogoAtEnd = false;
+const bool kShowLogoAtEnd = true;
 
 class AtithiSplashScreen extends StatefulWidget {
   const AtithiSplashScreen({required this.onFinished, super.key});
@@ -33,10 +35,8 @@ class _AtithiSplashScreenState extends State<AtithiSplashScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
     });
-    _controller = AnimationController(
-      vsync: this,
-      duration: _animationDuration,
-    )..addListener(_onAnimationProgress);
+    _controller = AnimationController(vsync: this, duration: _animationDuration)
+      ..addListener(_onAnimationProgress);
     if (kShowLogoAtEnd) {
       _controller.addStatusListener((status) {
         if (status == AnimationStatus.completed) _finishAfterPause();
@@ -72,7 +72,9 @@ class _AtithiSplashScreenState extends State<AtithiSplashScreen>
         animation: _controller,
         builder: (context, _) {
           final t = _controller.value;
-          final sceneOpacity = kShowLogoAtEnd ? 1 - _interval(t, .78, .90) : 1.0;
+          final sceneOpacity = kShowLogoAtEnd
+              ? 1 - _interval(t, .78, .90)
+              : 1.0;
           final logoOpacity = kShowLogoAtEnd ? _interval(t, .82, 1) : 0.0;
           final logoScale = .85 + .15 * _interval(t, .82, 1);
           final logoSize = math.min(
@@ -108,12 +110,7 @@ class _AtithiSplashScreenState extends State<AtithiSplashScreen>
                             ),
                           ],
                         ),
-                        child: Image.asset(
-                          'assets/splash_logo.png',
-                          fit: BoxFit.contain,
-                          semanticLabel:
-                              'Atithi — Better Stays. Happier Guests.',
-                        ),
+                        child: AtithiLogo(size: logoSize),
                       ),
                     ),
                   ),

@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const _navy = Color(0xFF0B2447);
+import '../../widgets/atithi_logo.dart';
+
 const _deepNavy = Color(0xFF1B1417);
 const _gold = Color(0xFFE2BF73);
 const _sand = Color(0xFFEBDDBB);
@@ -953,99 +954,7 @@ class SplashPainter extends CustomPainter {
     }
   }
 
-  void _logo(Canvas c, double t) {
-    final fade = _ease(_seg(t, 6.8, 7.9));
-    if (fade <= 0) return;
-    c.save();
-    c.translate(0, 14 * (1 - fade));
-    final arch = Path()
-      ..moveTo(165, 440)
-      ..lineTo(165, 395)
-      ..arcTo(const Rect.fromLTWH(165, 365, 60, 60), math.pi, math.pi, false)
-      ..lineTo(225, 440)
-      ..close();
-    final metric = arch.computeMetrics().first, draw = _seg(t, 6.9, 8.1);
-    c.drawPath(
-      metric.extractPath(0, math.min(200, metric.length) * draw),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round
-        ..color = _navy.withValues(alpha: fade),
-    );
-    c.drawCircle(
-      const Offset(195, 412),
-      9,
-      Paint()..color = _gold.withValues(alpha: fade),
-    );
-    final wave = Path()
-      ..moveTo(172, 430)
-      ..quadraticBezierTo(177, 426, 182, 430)
-      ..quadraticBezierTo(187, 434, 192, 430)
-      ..quadraticBezierTo(197, 426, 202, 430)
-      ..quadraticBezierTo(207, 434, 212, 430)
-      ..quadraticBezierTo(217, 426, 222, 430);
-    c.drawPath(
-      wave,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = _navy.withValues(alpha: fade),
-    );
-    _text(
-      c,
-      'Atithi',
-      const Offset(195, 506),
-      GoogleFonts.playfairDisplay(
-        fontSize: 54,
-        fontWeight: FontWeight.w600,
-        fontStyle: FontStyle.italic,
-        color: _navy.withValues(alpha: fade),
-      ),
-    );
-    _text(
-      c,
-      'अतिथि',
-      const Offset(195, 540),
-      GoogleFonts.notoSerifDevanagari(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: const Color(0xFFA8802F).withValues(alpha: fade),
-      ),
-    );
-    _text(
-      c,
-      'Atithi Devo Bhava',
-      const Offset(195, 584),
-      GoogleFonts.playfairDisplay(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        fontStyle: FontStyle.italic,
-        color: _navy.withValues(alpha: fade),
-      ),
-    );
-    _text(
-      c,
-      'Stays that welcome you like family',
-      const Offset(195, 606),
-      GoogleFonts.dmSans(
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
-        color: const Color(0xFF6B6F7A).withValues(alpha: fade),
-      ),
-    );
-    for (var i = 0; i < 3; i++) {
-      c.drawCircle(
-        Offset(183.0 + 12.0 * i, 760),
-        3.5,
-        Paint()
-          ..color = _gold.withValues(
-            alpha: fade * (.5 + .5 * math.sin(t * 6 - i * .8)),
-          ),
-      );
-    }
-    c.restore();
-  }
+  void _logo(Canvas c, double t) {}
 
   void _text(Canvas c, String text, Offset baseline, TextStyle style) {
     final tp = TextPainter(
@@ -1226,6 +1135,27 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
             ),
+          ),
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final fade = Curves.easeInOut.transform(
+                ((_controller.value - .80) / .13).clamp(0.0, 1.0),
+              );
+              return IgnorePointer(
+                child: Opacity(
+                  opacity: fade,
+                  child: Center(
+                    child: AtithiLogo(
+                      size: math.min(
+                        MediaQuery.sizeOf(context).width * .62,
+                        250,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
