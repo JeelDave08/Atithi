@@ -83,7 +83,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/bookings',
         builder: (context, state) => const PropertyBookingsScreen(),
       ),
-      GoRoute(path: '/rooms', builder: (context, state) => const RoomsScreen()),
+      GoRoute(
+        path: '/rooms',
+        builder: (context, state) {
+          final selection = state.extra;
+          if (selection is RoomSearchSelection) {
+            return RoomsScreen(
+              checkIn: selection.checkIn,
+              checkOut: selection.checkOut,
+              adults: selection.adults,
+              children: selection.children,
+            );
+          }
+          return const RoomsScreen();
+        },
+      ),
       GoRoute(
         path: '/availability',
         builder: (context, state) => AvailabilityScreen(

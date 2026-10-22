@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,16 +8,28 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../models/room.dart';
-import '../../core/image_utils.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
+import '../room_details/room_details_screen.dart';
+import '../room_details/room_details_constants.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
 import 'widgets/rooms_header.dart';
 import 'widgets/why_choose_atithi_card.dart';
 
 class RoomsScreen extends ConsumerStatefulWidget {
-  const RoomsScreen({super.key});
+  const RoomsScreen({
+    this.checkIn,
+    this.checkOut,
+    this.adults = 2,
+    this.children = 0,
+    super.key,
+  });
+
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final int adults;
+  final int children;
 
   @override
   ConsumerState<RoomsScreen> createState() => _RoomsScreenState();
@@ -472,27 +483,54 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         }, childCount: (_rooms.length / columns).ceil()),
       );
 
-  Widget _buildRoomCard(BuildContext context, Room room) => RepaintBoundary(
-    key: ValueKey(room.id),
-    child: RoomCard(
+  Widget _buildRoomCard(BuildContext context, Room room) {
+    final today = DateTime.now();
+    final checkIn =
+        widget.checkIn ?? DateTime(today.year, today.month, today.day);
+    final requestedCheckOut = widget.checkOut;
+    final checkOut =
+        requestedCheckOut != null && requestedCheckOut.isAfter(checkIn)
+        ? requestedCheckOut
+        : checkIn.add(const Duration(days: 1));
+    final nights = checkOut.difference(checkIn).inDays;
+    final total = (room.pricePerNight ?? 0) * nights * (1 + kTaxRate);
+
+    return RepaintBoundary(
       key: ValueKey(room.id),
-      room: room,
-      isFavorite: _favorites.contains(room.id),
-      onFavorite: () => _favorite(room),
-      onDetails: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => RoomDetailsScreen(roomId: room.id, room: room),
+      child: RoomCard(
+        key: ValueKey(room.id),
+        room: room,
+        isFavorite: _favorites.contains(room.id),
+        onFavorite: () => _favorite(room),
+        onDetails: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => RoomDetailsScreen(
+              roomId: room.id,
+              room: room,
+              checkIn: widget.checkIn,
+              checkOut: widget.checkOut,
+              adults: widget.adults,
+              children: widget.children,
+            ),
+          ),
+        ),
+        onBook: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => RoomBookingPlaceholder(
+              room: room,
+              checkIn: checkIn,
+              checkOut: checkOut,
+              adults: widget.adults,
+              children: widget.children,
+              total: total,
+            ),
+          ),
         ),
       ),
-      onBook: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => RoomBookingPlaceholder(room: room),
-        ),
-      ),
-    ),
-  );
+    );
+  }
 
   Widget _state(
     IconData icon,
@@ -710,112 +748,5 @@ class _SortLabel extends StatelessWidget {
         ),
       ),
     ],
-  );
-}
-
-class RoomDetailsScreen extends StatelessWidget {
-  const RoomDetailsScreen({
-    required this.roomId,
-    required this.room,
-    super.key,
-  });
-
-  final String roomId;
-  final Room room;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: Colors.white,
-      title: const Text('Room Details'),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(18),
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: room.imageUrls.isEmpty
-              ? const SizedBox(
-                  height: 230,
-                  child: ColoredBox(
-                    color: AppColors.cream,
-                    child: Center(
-                      child: Icon(
-                        Icons.bed_outlined,
-                        color: AppColors.greyText,
-                      ),
-                    ),
-                  ),
-                )
-              : CachedNetworkImage(
-                  imageUrl: optimizedImageUrl(
-                    room.imageUrls.first,
-                    width: 1600,
-                  ),
-                  width: double.infinity,
-                  height: 230,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 800,
-                  maxWidthDiskCache: 800,
-                  fadeInDuration: const Duration(milliseconds: 200),
-                  filterQuality: FilterQuality.low,
-                  placeholder: (_, _) =>
-                      const ColoredBox(color: AppColors.cream),
-                  errorWidget: (_, _, _) => const SizedBox(
-                    height: 230,
-                    child: ColoredBox(
-                      color: AppColors.cream,
-                      child: Center(
-                        child: Icon(
-                          Icons.bed_outlined,
-                          color: AppColors.greyText,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-        ),
-        Text(
-          room.roomName ?? 'Room',
-          style: const TextStyle(
-            fontSize: 26,
-            color: AppColors.navy,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (room.description != null) Text(room.description!),
-        Text('₹${room.pricePerNight?.toStringAsFixed(0) ?? '—'} / night'),
-      ],
-    ),
-  );
-}
-
-class RoomBookingPlaceholder extends StatelessWidget {
-  const RoomBookingPlaceholder({required this.room, super.key});
-
-  final Room room;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: Colors.white,
-      title: const Text('Book your stay'),
-    ),
-    body: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Booking flow is not available yet.\n\n'
-          '${room.roomName ?? 'Room'} · '
-          '₹${room.pricePerNight?.toStringAsFixed(0) ?? '—'} / night',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.navy, fontSize: 18),
-        ),
-      ),
-    ),
   );
 }
