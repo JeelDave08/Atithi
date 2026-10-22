@@ -63,7 +63,7 @@ class _AuthFieldState extends State<AuthField> {
       hintStyle: const TextStyle(color: Color(0xFF758198), fontSize: 16),
       filled: true,
       fillColor: AppColors.cream,
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: const BoxConstraints.tightFor(height: 56),
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       prefixIcon: widget.prefixIcon == null

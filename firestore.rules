@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function propertyIsActive(propertyId) {
+      return exists(/databases/$(database)/documents/properties/$(propertyId))
+        && get(/databases/$(database)/documents/properties/$(propertyId)).data.active_status == true;
+    }
+
+    function isPropertyAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /properties/{propertyId} {
+      allow read: if signedIn() && resource.data.active_status == true;
+      allow create, update, delete: if isPropertyAdmin();
+
+      match /services/{serviceId} {
+        allow read: if signedIn() && propertyIsActive(propertyId);
+        allow create, update, delete: if isPropertyAdmin();
+      }
+
+      match /rooms/{roomId} {
+        allow read: if signedIn() && propertyIsActive(propertyId);
+        allow create, update, delete: if isPropertyAdmin();
+      }
+
+      match /contact_messages/{messageId} {
+        allow create: if signedIn()
+          && propertyIsActive(propertyId)
+          && request.resource.data.keys().hasOnly([
+            'name', 'email', 'subject', 'message', 'created_at', 'status'
+          ])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 120
+          && request.resource.data.email is string
+          && request.resource.data.email.size() <= 254
+          && request.resource.data.subject is string
+          && request.resource.data.subject.size() > 0
+          && request.resource.data.subject.size() <= 160
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 5000
+          && request.resource.data.status == 'new'
+          && request.resource.data.created_at == request.time;
+        allow read, update, delete: if isPropertyAdmin();
+      }
+    }
+  }
+}

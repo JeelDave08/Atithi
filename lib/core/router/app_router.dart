@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../auth/auth_repository.dart';
 import '../../features/availability/availability_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/home/profile_screen.dart';
 import '../../features/property/property.dart';
 import '../../features/property/property_screen.dart';
+import '../../property_experience.dart';
 import '../../screens/auth_screen.dart';
 import '../../screens/forgot_password_screen.dart';
 import '../../screens/register_screen.dart';
@@ -57,8 +59,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
       GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
         path: '/property',
         builder: (context, state) => const PropertyScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        builder: (context, state) => const PropertyAboutScreen(),
+      ),
+      GoRoute(
+        path: '/services',
+        builder: (context, state) => const PropertyServicesScreen(),
+      ),
+      GoRoute(
+        path: '/contact',
+        builder: (context, state) => const PropertyContactScreen(),
+      ),
+      GoRoute(
+        path: '/rooms',
+        builder: (context, state) => PropertyRoomsScreen(
+          selection: state.extra is RoomSearchSelection
+              ? state.extra! as RoomSearchSelection
+              : null,
+        ),
       ),
       GoRoute(
         path: '/availability',

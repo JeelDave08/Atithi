@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/constants.dart';
 
 enum AuthFailureCode {
   emailAlreadyInUse,
@@ -20,6 +23,26 @@ class AuthFailure implements Exception {
   String toString() => message;
 }
 
+enum GoogleSignInStatus { success, cancelled, error }
+
+class GoogleSignInResult {
+  const GoogleSignInResult._(this.status, {this.message});
+
+  const GoogleSignInResult.success() : this._(GoogleSignInStatus.success);
+
+  const GoogleSignInResult.cancelled()
+    : this._(
+        GoogleSignInStatus.cancelled,
+        message: 'Google sign-in was cancelled.',
+      );
+
+  const GoogleSignInResult.error(String message)
+    : this._(GoogleSignInStatus.error, message: message);
+
+  final GoogleSignInStatus status;
+  final String? message;
+}
+
 abstract interface class AuthRepository {
   Future<void> register({
     required String fullName,
@@ -34,7 +57,7 @@ abstract interface class AuthRepository {
     required String password,
     required bool rememberMe,
   });
-  Future<void> signInWithGoogle();
+  Future<GoogleSignInResult> signInWithGoogle();
   Future<void> sendPasswordReset(String email);
   Future<void> signOut();
   Stream<User?> authStateChanges();
@@ -52,7 +75,26 @@ class AuthService implements AuthRepository {
       _firestoreOverride ?? FirebaseFirestore.instance;
   static const _rememberKey = 'atithi_remember_me';
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static bool _googleSignInInitialized = false;
   static Future<void>? _googleInitialization;
+
+  static Future<void> initializeGoogleSignIn() {
+    if (_googleSignInInitialized) return Future<void>.value();
+    return _googleInitialization ??= _initializeGoogleSignIn();
+  }
+
+  static Future<void> _initializeGoogleSignIn() async {
+    try {
+      await _googleSignIn.initialize(
+        clientId: kIsWeb ? googleWebClientId : null,
+        serverClientId: kIsWeb ? null : googleWebClientId,
+      );
+      _googleSignInInitialized = true;
+    } catch (_) {
+      _googleInitialization = null;
+      rethrow;
+    }
+  }
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
@@ -80,6 +122,7 @@ class AuthService implements AuthRepository {
       await user.updateDisplayName(name.trim());
       final now = FieldValue.serverTimestamp();
       await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
         'name': name.trim(),
         'email': user.email ?? email.trim(),
         'phone': phone,
@@ -121,36 +164,114 @@ class AuthService implements AuthRepository {
     }
   }
 
-  Future<void> signInWithGoogle() async {
+  Future<GoogleSignInResult> signInWithGoogle() async {
     try {
-      _googleInitialization ??= _googleSignIn.initialize();
-      await _googleInitialization;
-      final account = await _googleSignIn.authenticate();
-      final credential = GoogleAuthProvider.credential(
-        idToken: account.authentication.idToken,
-      );
-      final result = await _auth.signInWithCredential(credential);
+      await initializeGoogleSignIn();
+      final UserCredential result;
+      if (kIsWeb) {
+        result = await _auth.signInWithPopup(GoogleAuthProvider());
+      } else {
+        final account = await _googleSignIn.authenticate(
+          scopeHint: const ['email', 'profile'],
+        );
+        final idToken = account.authentication.idToken;
+        if (idToken == null || idToken.isEmpty) {
+          const message =
+              'Google sign-in is not configured correctly. Please check SHA-1, authorized domains and google-services.json.';
+          debugPrint('Google sign-in failed: ID token was missing.');
+          return const GoogleSignInResult.error(message);
+        }
+        final credential = GoogleAuthProvider.credential(idToken: idToken);
+        result = await _auth.signInWithCredential(credential);
+      }
       final user = result.user;
-      if (user != null) await _ensureGoogleUserDocument(user);
+      if (user == null) {
+        const message = 'Google sign-in completed without a Firebase user.';
+        debugPrint(message);
+        return const GoogleSignInResult.error(message);
+      }
+      await _ensureGoogleUserDocument(user);
       await _remember(true);
+      return const GoogleSignInResult.success();
     } on FirebaseAuthException catch (e) {
       _logAuthError(e);
-      throw _toAuthFailure(e);
-    } on GoogleSignInException catch (e) {
-      debugPrint('Google sign-in error: ${e.code} - ${e.description}');
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        throw const AuthFailure(
-          AuthFailureCode.cancelled,
-          'Google sign-in was cancelled.',
+      if (_isGoogleCancellation('${e.code} ${e.message}')) {
+        return const GoogleSignInResult.cancelled();
+      }
+      if (_isNetworkError('${e.code} ${e.message}')) {
+        return const GoogleSignInResult.error('No internet connection.');
+      }
+      if (_isGoogleConfigurationError('${e.code} ${e.message}')) {
+        return const GoogleSignInResult.error(
+          'Google sign-in is not configured correctly. Please check SHA-1, authorized domains and google-services.json.',
         );
       }
-      throw AuthFailure(
-        AuthFailureCode.unknown,
-        e.description ?? 'Google sign-in failed. Please try again.',
+      return GoogleSignInResult.error(
+        e.message ?? 'Google sign-in failed (${e.code}).',
+      );
+    } on PlatformException catch (e) {
+      debugPrint(
+        'Google sign-in PlatformException: ${e.code} - ${e.message}; '
+        'details: ${e.details}',
+      );
+      final diagnostic = '${e.code} ${e.message} ${e.details}';
+      if (_isGoogleCancellation(diagnostic)) {
+        return const GoogleSignInResult.cancelled();
+      }
+      if (_isGoogleConfigurationError(diagnostic)) {
+        return const GoogleSignInResult.error(
+          'Google sign-in is not configured correctly. Please check SHA-1, authorized domains and google-services.json.',
+        );
+      }
+      if (_isNetworkError(diagnostic)) {
+        return const GoogleSignInResult.error('No internet connection.');
+      }
+      return GoogleSignInResult.error(
+        e.message?.trim().isNotEmpty == true
+            ? e.message!
+            : 'Google sign-in failed (${e.code}).',
+      );
+    } on GoogleSignInException catch (e) {
+      final diagnostic = '$e ${e.code} ${e.description} ${e.details}';
+      debugPrint('Google sign-in error: $diagnostic');
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return const GoogleSignInResult.cancelled();
+      }
+      if (_isGoogleConfigurationError(diagnostic) ||
+          e.code == GoogleSignInExceptionCode.clientConfigurationError ||
+          e.code == GoogleSignInExceptionCode.providerConfigurationError) {
+        return const GoogleSignInResult.error(
+          'Google sign-in is not configured correctly. Please check SHA-1, authorized domains and google-services.json.',
+        );
+      }
+      if (_isNetworkError(diagnostic)) {
+        return const GoogleSignInResult.error('No internet connection.');
+      }
+      return GoogleSignInResult.error(
+        e.description?.trim().isNotEmpty == true ? e.description! : diagnostic,
       );
     } on FirebaseException catch (e) {
       debugPrint('Firebase error: ${e.code} - ${e.message}');
-      rethrow;
+      if (_isNetworkError('${e.code} ${e.message}')) {
+        return const GoogleSignInResult.error('No internet connection.');
+      }
+      return GoogleSignInResult.error(
+        e.message?.trim().isNotEmpty == true
+            ? e.message!
+            : 'Firebase error (${e.code}).',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Unexpected Google sign-in error: $e\n$stackTrace');
+      final diagnostic = e.toString();
+      if (_isGoogleConfigurationError(diagnostic)) {
+        return const GoogleSignInResult.error(
+          'Google sign-in is not configured correctly. Please check SHA-1, authorized domains and google-services.json.',
+        );
+      }
+      if (_isNetworkError(diagnostic)) {
+        return const GoogleSignInResult.error('No internet connection.');
+      }
+      return GoogleSignInResult.error(diagnostic);
     }
   }
 
@@ -189,6 +310,10 @@ class AuthService implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    if (!kIsWeb) {
+      await initializeGoogleSignIn();
+      await _googleSignIn.signOut();
+    }
     await _auth.signOut();
     await _remember(false);
   }
@@ -204,22 +329,60 @@ class AuthService implements AuthRepository {
 
   Future<void> _ensureGoogleUserDocument(User user) async {
     final reference = _firestore.collection('users').doc(user.uid);
-    final snapshot = await reference.get();
-    final now = FieldValue.serverTimestamp();
-    if (!snapshot.exists) {
-      await reference.set({
-        'name': user.displayName ?? '',
-        'email': user.email ?? '',
-        'phone': user.phoneNumber ?? '',
-        'countryCode': '',
-        'countryIso': '',
-        'photoUrl': user.photoURL,
-        'createdAt': now,
-        'lastLogin': now,
-      });
-    } else {
-      await reference.set({'lastLogin': now}, SetOptions(merge: true));
-    }
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      final now = FieldValue.serverTimestamp();
+      if (!snapshot.exists) {
+        transaction.set(reference, {
+          'uid': user.uid,
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'photoUrl': user.photoURL,
+          'createdAt': now,
+        });
+      }
+    });
+  }
+
+  bool _isGoogleCancellation(Object diagnostic) {
+    final normalized = diagnostic.toString().toLowerCase();
+    return normalized.contains('popup-closed-by-user') ||
+        normalized.contains('user-canceled') ||
+        normalized.contains('user-cancelled') ||
+        normalized.contains('user_canceled') ||
+        normalized.contains('cancelled') ||
+        normalized.contains('canceled') ||
+        normalized.contains('sign_in_canceled');
+  }
+
+  bool _isGoogleConfigurationError(String diagnostic) {
+    final normalized = diagnostic.toLowerCase();
+    return normalized.contains('sign_in_failed') ||
+        normalized.contains('unauthorized-domain') ||
+        normalized.contains('unauthorized domain') ||
+        normalized.contains('apiexception: 10') ||
+        normalized.contains('apiexception 10') ||
+        normalized.contains('status code: 10') ||
+        normalized.contains('statuscode=10') ||
+        normalized.contains('code: 10') ||
+        normalized.contains('apiexception: 12500') ||
+        normalized.contains('apiexception 12500') ||
+        normalized.contains('status code: 12500') ||
+        normalized.contains('statuscode=12500') ||
+        normalized.contains('code: 12500');
+  }
+
+  bool _isNetworkError(String diagnostic) {
+    final normalized = diagnostic.toLowerCase();
+    return normalized.contains('network-request-failed') ||
+        normalized.contains('network_error') ||
+        normalized.contains('network error') ||
+        normalized.contains('unavailable') ||
+        normalized.contains('connection timed out') ||
+        normalized.contains('socketexception') ||
+        normalized.contains('apiexception: 7') ||
+        normalized.contains('status code: 7') ||
+        normalized.contains('no internet');
   }
 
   void _logAuthError(FirebaseAuthException e) =>

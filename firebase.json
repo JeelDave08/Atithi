@@ -1,1 +1,25 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"atithi-app-48314","appId":"1:18265070121:android:d7ddf6628c589238a11a38","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"atithi-app-48314","configurations":{"android":"1:18265070121:android:d7ddf6628c589238a11a38","web":"1:18265070121:web:d8716e49697c1198a11a38"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "atithi-app-48314",
+          "appId": "1:18265070121:android:d7ddf6628c589238a11a38",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "atithi-app-48314",
+          "configurations": {
+            "android": "1:18265070121:android:d7ddf6628c589238a11a38",
+            "web": "1:18265070121:web:d8716e49697c1198a11a38"
+          }
+        }
+      }
+    }
+  }
+}

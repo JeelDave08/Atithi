@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_repository.dart';
 import '../theme/app_colors.dart';
 import '../widgets/auth_components.dart';
-import '../widgets/auth_field.dart';
+import '../widgets/app_text_field.dart';
 import '../widgets/atithi_logo.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
         rememberMe: true,
       );
-      if (mounted) showAuthMessage(context, 'Signed in successfully.');
+      if (mounted) context.go('/home');
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
     } catch (_) {
@@ -63,14 +63,26 @@ class _LoginScreenState extends State<LoginScreen> {
       _googleSignInPending = true;
     });
     try {
-      await widget.authRepository.signInWithGoogle();
-      if (mounted)
-        showAuthMessage(context, 'Signed in with Google successfully.');
+      final result = await widget.authRepository.signInWithGoogle();
+      if (!mounted) return;
+      switch (result.status) {
+        case GoogleSignInStatus.success:
+          context.go('/home');
+        case GoogleSignInStatus.cancelled:
+          showAuthMessage(context, 'Google sign-in was cancelled.');
+        case GoogleSignInStatus.error:
+          showAuthMessage(
+            context,
+            result.message ?? 'Google sign-in failed. Please try again.',
+          );
+      }
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
-    } catch (_) {
-      if (mounted)
-        showAuthMessage(context, 'Google sign-in failed. Please try again.');
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Unexpected Google sign-in handler error: $error\n$stackTrace',
+      );
+      if (mounted) showAuthMessage(context, error.toString());
     } finally {
       if (mounted)
         setState(() {
@@ -85,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Center(child: AtithiLogo(size: 156)),
+        const Center(child: AtithiLogo()),
         const SizedBox(height: 24),
         const AuthHeading(
           title: 'Welcome back',
@@ -97,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             children: [
-              AuthField(
+              AppTextField(
                 hint: 'Email address',
                 controller: _emailController,
                 validator: validateEmailAddress,
@@ -105,8 +117,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 14),
-              AuthField(
+              const SizedBox(height: 16),
+              AppTextField(
                 hint: 'Password',
                 controller: _passwordController,
                 validator: _validatePassword,

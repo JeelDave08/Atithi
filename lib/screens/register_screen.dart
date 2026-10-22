@@ -7,7 +7,7 @@ import '../auth/auth_repository.dart';
 import '../data/countries.dart';
 import '../widgets/atithi_logo.dart';
 import '../widgets/auth_components.dart';
-import '../widgets/auth_field.dart';
+import '../widgets/app_text_field.dart';
 import '../widgets/phone_field.dart';
 import 'terms_screen.dart';
 
@@ -26,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   CountryDialCode _country = indiaCountry;
   bool _isSubmitting = false;
+  bool _acceptedTerms = false;
 
   @override
   void dispose() {
@@ -46,13 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _validateMobile(String? value) {
     final number = value?.trim() ?? '';
     if (number.isEmpty) return 'Please enter your mobile number.';
-    if (!RegExp(r'^[0-9]+$').hasMatch(number)) return 'Use digits only.';
-    if (number.length != _country.phoneLength)
-      return 'Enter exactly ' +
-          _country.phoneLength.toString() +
-          ' digits for ' +
-          _country.name +
-          '.';
+    if (number.length != 10) return 'Enter a valid 10-digit number.';
     return null;
   }
 
@@ -64,11 +59,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    if (_isSubmitting || !_formKey.currentState!.validate()) return;
-    final accepted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (_) => const TermsAndConditionsScreen()),
-    );
-    if (accepted != true || !mounted) return;
+    if (_isSubmitting) return;
+    if (!_acceptedTerms) {
+      showAuthMessage(context, 'Please accept the Terms & Conditions');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
     try {
       await widget.authRepository.register(
@@ -98,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Center(child: AtithiLogo(size: 144)),
+        const Center(child: AtithiLogo()),
         const SizedBox(height: 20),
         const AuthHeading(
           title: 'Create your account',
@@ -110,15 +106,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             children: [
-              AuthField(
+              AppTextField(
                 hint: 'Full name',
                 controller: _nameController,
                 validator: _validateName,
                 prefixIcon: Icons.person_outline_rounded,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 14),
-              AuthField(
+              const SizedBox(height: 16),
+              AppTextField(
                 hint: 'Email address',
                 controller: _emailController,
                 validator: validateEmailAddress,
@@ -126,7 +122,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               PhoneField(
                 country: _country,
                 controller: _mobileController,
@@ -134,8 +130,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     setState(() => _country = country),
                 validator: _validateMobile,
               ),
-              const SizedBox(height: 14),
-              AuthField(
+              const SizedBox(height: 16),
+              AppTextField(
                 hint: 'Password',
                 controller: _passwordController,
                 validator: _validatePassword,
@@ -148,6 +144,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        Row(
+          children: [
+            Checkbox(
+              value: _acceptedTerms,
+              onChanged: _isSubmitting
+                  ? null
+                  : (value) => setState(() => _acceptedTerms = value ?? false),
+              activeColor: const Color(0xFFE0BC73),
+              checkColor: const Color(0xFF0B2347),
+              side: const BorderSide(color: Color(0xFFFAF5EB)),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: _isSubmitting
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TermsAndConditionsScreen(),
+                        ),
+                      ),
+                child: const Text.rich(
+                  TextSpan(
+                    style: TextStyle(color: Color(0xFFFAF5EB), fontSize: 14),
+                    children: [
+                      TextSpan(text: 'I agree to the '),
+                      TextSpan(
+                        text: 'Terms & Conditions',
+                        style: TextStyle(
+                          color: Color(0xFFE0BC73),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         AuthPrimaryButton(
           label: 'Create Account',
           onPressed: _isSubmitting ? null : _submit,
@@ -159,14 +196,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             prompt: 'Already have an account?',
             label: 'Sign In',
             onPressed: _isSubmitting ? null : () => context.pop(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'By creating an account, you agree to our Terms & Conditions.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFFBAC5D6), fontSize: 12),
           ),
         ),
       ],

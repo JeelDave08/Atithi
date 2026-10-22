@@ -68,7 +68,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        const Center(child: AtithiLogo(size: 148)),
+        const Center(child: AtithiLogo()),
         const SizedBox(height: 24),
         const AuthHeading(
           title: 'Forgot password?',

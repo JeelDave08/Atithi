@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../atithi_home_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/sunset_widgets.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/logout_dialog.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class LegacyHomeScreen extends StatelessWidget {
+  const LegacyHomeScreen({super.key});
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Palette.navy,
@@ -73,19 +76,48 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                         const Spacer(),
-                        Container(
-                          width: 42,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Palette.gold),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(21),
-                              bottom: Radius.circular(8),
-                            ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Account options',
+                          color: AppColors.cream,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
-                            Icons.wb_sunny_outlined,
-                            color: Palette.gold,
+                          onSelected: (value) {
+                            if (value == 'logout') showLogoutDialog(context);
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem<String>(
+                              value: 'logout',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.logout,
+                                    color: AppColors.navy,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Log out',
+                                    style: TextStyle(color: AppColors.navy),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          child: Container(
+                            width: 42,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Palette.gold),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(21),
+                                bottom: Radius.circular(8),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.wb_sunny_outlined,
+                              color: Palette.gold,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 22),
@@ -318,4 +350,11 @@ class _StayImageFallback extends StatelessWidget {
       ),
     ),
   );
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const AtithiHomeScreen();
 }

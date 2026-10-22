@@ -13,22 +13,14 @@ class TermsAndConditionsScreen extends StatefulWidget {
 }
 
 class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
-  bool _accepted = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.navy,
+    backgroundColor: AppColors.cream,
     appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: AppColors.cream,
+      backgroundColor: AppColors.cream,
+      foregroundColor: AppColors.navy,
       elevation: 0,
-      title: const Text(
-        'Terms & Conditions',
-        style: TextStyle(
-          color: AppColors.cream,
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      title: const SizedBox.shrink(),
     ),
     body: SafeArea(
       top: false,
@@ -41,32 +33,34 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Center(child: AtithiLogo(size: 132)),
+                    const Center(child: AtithiLogo(size: 84)),
                     const SizedBox(height: 18),
-                    const Text(
-                      termsPageHeading,
-                      style: TextStyle(
-                        color: AppColors.cream,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                    const Center(
+                      child: Text(
+                        'Terms & Conditions',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       termsLastUpdated,
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                      style: TextStyle(color: AppColors.navy, fontSize: 12),
                     ),
                     const SizedBox(height: 16),
                     const Text(
                       termsIntroduction,
-                      style: TextStyle(color: AppColors.muted, height: 1.55),
+                      style: TextStyle(color: AppColors.navy, height: 1.55),
                     ),
                     const SizedBox(height: 22),
                     for (var i = 0; i < termsContent.length; i++) ...[
                       Text(
-                        (i + 1).toString() + '. ' + termsContent[i].title,
+                        termsContent[i].title,
                         style: const TextStyle(
-                          color: AppColors.gold,
+                          color: AppColors.navy,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
@@ -75,7 +69,7 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
                       Text(
                         termsContent[i].body,
                         style: const TextStyle(
-                          color: AppColors.muted,
+                          color: AppColors.navy,
                           height: 1.55,
                         ),
                       ),
@@ -88,29 +82,9 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
-            child: Column(
-              children: [
-                CheckboxListTile(
-                  value: _accepted,
-                  onChanged: (value) =>
-                      setState(() => _accepted = value ?? false),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.gold,
-                  checkColor: AppColors.navy,
-                  title: const Text(
-                    'I agree to the Terms & Conditions',
-                    style: TextStyle(color: AppColors.cream, fontSize: 14),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                AuthPrimaryButton(
-                  label: 'I Agree & Create Account',
-                  onPressed: _accepted
-                      ? () => Navigator.pop(context, true)
-                      : null,
-                ),
-              ],
+            child: AuthPrimaryButton(
+              label: 'I Agree',
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],

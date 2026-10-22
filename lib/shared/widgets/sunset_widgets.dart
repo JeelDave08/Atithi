@@ -137,7 +137,13 @@ class FloatingBottomNav extends StatelessWidget {
           5,
           (i) => InkWell(
             borderRadius: BorderRadius.circular(28),
-            onTap: () => context.go(i == 0 ? '/home' : '/coming/${labels[i]}'),
+            onTap: () => context.go(
+              i == 0
+                  ? '/home'
+                  : i == 4
+                  ? '/profile'
+                  : '/coming/${labels[i]}',
+            ),
             child: SizedBox(
               width: 50,
               child: Column(

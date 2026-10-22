@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AtithiLogo extends StatelessWidget {
-  const AtithiLogo({super.key, this.size = 156});
+  const AtithiLogo({super.key, this.size = 128});
 
   final double size;
 
@@ -9,11 +9,20 @@ class AtithiLogo extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     label: 'Atithi logo',
     image: true,
-    child: Image.asset(
-      'assets/images/atithi_logo.png',
+    child: Container(
       width: size,
       height: size,
-      fit: BoxFit.contain,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5EB),
+        borderRadius: BorderRadius.circular(size == 128 ? 28 : 20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Image.asset(
+          'assets/images/atithi_logo.png',
+          fit: BoxFit.contain,
+        ),
+      ),
     ),
   );
 }
