@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -47,8 +47,12 @@ class PropertyContent {
       description: _stringValue(data['description']),
       aboutContent: _stringValue(data['about_content']),
       philosophy: _stringValue(data['philosophy']),
-      contactPhone: _stringValue(data['phone']),
-      contactEmail: _stringValue(data['email']),
+      contactPhone: _stringValue(data['phone']).isNotEmpty
+          ? _stringValue(data['phone'])
+          : _stringValue(data['contact_phone']),
+      contactEmail: _stringValue(data['email']).isNotEmpty
+          ? _stringValue(data['email'])
+          : _stringValue(data['contact_email']),
       address: _stringValue(data['address']),
       imageUrls: _stringList(data['image_urls']),
       highlights: _stringList(data['highlights']),
@@ -121,19 +125,18 @@ class PropertyRoom {
 }
 
 class PropertyContentRepository {
-  const PropertyContentRepository({this.supabaseClient, this.firestore});
+  const PropertyContentRepository({this.supabaseClient});
 
   final SupabaseClient? supabaseClient;
-  final FirebaseFirestore? firestore;
   SupabaseClient get _supabase => supabaseClient ?? Supabase.instance.client;
-  FirebaseFirestore get _firestore => firestore ?? FirebaseFirestore.instance;
 
   Future<PropertyContent?> getActiveProperty() async {
     try {
       final result = await _supabase
           .from('properties')
           .select(
-            'id, name, description, address, phone, email, is_published, created_at',
+            'id, name, description, about_content, philosophy, phone, email, '
+            'address, image_urls, highlights, map_url, is_published, created_at',
           )
           .eq('is_published', true)
           .order('created_at')
@@ -219,18 +222,32 @@ class PropertyContentRepository {
     required String subject,
     required String message,
   }) async {
-    await _firestore
-        .collection('properties')
-        .doc(propertyId)
-        .collection('contact_messages')
-        .add({
-          'name': name.trim(),
-          'email': email.trim(),
-          'subject': subject.trim(),
-          'message': message.trim(),
-          'created_at': FieldValue.serverTimestamp(),
-          'status': 'new',
-        });
+    try {
+      await _supabase.from('contact_messages').insert({
+        'property_id': propertyId,
+        'name': name.trim(),
+        'email': email.trim(),
+        'subject': subject.trim(),
+        'message': message.trim(),
+        'status': 'new',
+      });
+    } catch (error, stackTrace) {
+      _logPropertyDataFailure('Save contact message', error, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMyBookings() async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      throw StateError('Sign in to view your bookings.');
+    }
+    try {
+      final rows = await _supabase.from('bookings').select();
+      return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+    } catch (error, stackTrace) {
+      _logPropertyDataFailure('Load current user bookings', error, stackTrace);
+      rethrow;
+    }
   }
 }
 
@@ -950,6 +967,161 @@ class PropertyRoomDetailsScreen extends StatelessWidget {
   );
 }
 
+class PropertyBookingsScreen extends StatefulWidget {
+  const PropertyBookingsScreen({
+    this.repository = const PropertyContentRepository(),
+    super.key,
+  });
+
+  final PropertyContentRepository repository;
+
+  @override
+  State<PropertyBookingsScreen> createState() => _PropertyBookingsScreenState();
+}
+
+class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
+  late Future<List<Map<String, dynamic>>> _bookings;
+
+  @override
+  void initState() {
+    super.initState();
+    _bookings = widget.repository.getMyBookings();
+  }
+
+  @override
+  Widget build(BuildContext context) => _PropertyPage(
+    title: 'My Bookings',
+    child: FutureBuilder<List<Map<String, dynamic>>>(
+      future: _bookings,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _PageState(
+            message: 'We could not load your bookings.',
+            diagnostic: _debugDataError(snapshot.error),
+            isError: true,
+            onRetry: () =>
+                setState(() => _bookings = widget.repository.getMyBookings()),
+          );
+        }
+        if (!snapshot.hasData) return const _PageLoading();
+        final bookings = snapshot.data!;
+        if (bookings.isEmpty) {
+          return const _PageState(
+            message: 'Your Atithi reservations will appear here when you have a booking.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async {
+            final future = widget.repository.getMyBookings();
+            setState(() => _bookings = future);
+            await future;
+          },
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            itemCount: bookings.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final booking = bookings[index];
+              final room = _bookingValue(booking, const [
+                'room_name',
+                'room_type',
+                'property_name',
+              ]);
+              final status = _bookingValue(booking, const [
+                'status',
+                'booking_status',
+              ]);
+              final checkIn = _bookingValue(booking, const [
+                'check_in',
+                'check_in_date',
+                'arrival_date',
+              ]);
+              final checkOut = _bookingValue(booking, const [
+                'check_out',
+                'check_out_date',
+                'departure_date',
+              ]);
+              final reference = _bookingValue(booking, const [
+                'booking_reference',
+                'reference',
+              ]);
+              final total = _bookingValue(booking, const [
+                'total_amount',
+                'total_price',
+                'amount',
+              ]);
+              return Container(
+                padding: const EdgeInsets.all(17),
+                decoration: BoxDecoration(
+                  color: _experienceCard,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _experienceLightGold.withValues(alpha: .65),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      room ?? 'Reservation',
+                      style: const TextStyle(
+                        color: _experienceNavy,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (status != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        status,
+                        style: const TextStyle(color: _experienceGold),
+                      ),
+                    ],
+                    if (checkIn != null || checkOut != null) ...[
+                      const SizedBox(height: 9),
+                      Text(
+                        'Stay: ${checkIn ?? '—'} – ${checkOut ?? '—'}',
+                        style: const TextStyle(color: Color(0xFF4A4F5C)),
+                      ),
+                    ],
+                    if (reference != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        'Reference: $reference',
+                        style: const TextStyle(color: Color(0xFF4A4F5C)),
+                      ),
+                    ],
+                    if (total != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        'Total: $total',
+                        style: const TextStyle(
+                          color: _experienceNavy,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ),
+  );
+}
+
+String? _bookingValue(Map<String, dynamic> booking, List<String> keys) {
+  for (final key in keys) {
+    final value = booking[key];
+    if (value != null && value.toString().trim().isNotEmpty) {
+      return value.toString().trim();
+    }
+  }
+  return null;
+}
+
 class PropertyRoomsPreview extends StatelessWidget {
   const PropertyRoomsPreview({super.key});
 
@@ -1539,10 +1711,6 @@ class _PageState extends StatelessWidget {
 
 String? _debugDataError(Object? error) {
   if (!kDebugMode || error == null) return null;
-  if (error is FirebaseException) {
-    return '${error.plugin}/${error.code}: '
-        '${error.message ?? 'No additional details.'}';
-  }
   return error.toString();
 }
 

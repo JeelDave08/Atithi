@@ -79,6 +79,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/contact',
         builder: (context, state) => const PropertyContactScreen(),
       ),
+      GoRoute(
+        path: '/bookings',
+        builder: (context, state) => const PropertyBookingsScreen(),
+      ),
       GoRoute(path: '/rooms', builder: (context, state) => const RoomsScreen()),
       GoRoute(
         path: '/availability',

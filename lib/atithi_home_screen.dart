@@ -832,14 +832,7 @@ class _HomeBottomNavigation extends StatelessWidget {
             _NavItem(
               icon: Icons.event_note_outlined,
               label: 'Bookings',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AtithiDestinationScreen(
-                    title: 'My Bookings',
-                    description: 'Your Atithi reservations will appear here when you have a booking.',
-                  ),
-                ),
-              ),
+              onTap: () => context.push('/bookings'),
             ),
             _NavItem(
               icon: Icons.person_outline_rounded,
