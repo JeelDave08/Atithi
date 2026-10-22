@@ -49,6 +49,7 @@ class RoomCard extends StatelessWidget {
           children: [
             if (scrollOffset == null)
               RoomImageCarousel(
+                key: ValueKey(room.id),
                 room: room,
                 isFavorite: isFavorite,
                 onFavorite: onFavorite,
@@ -61,6 +62,7 @@ class RoomCard extends StatelessWidget {
                   child: Transform.translate(
                     offset: Offset(0, (offset * .035) % 12 - 6),
                     child: RoomImageCarousel(
+                      key: ValueKey(room.id),
                       room: room,
                       isFavorite: isFavorite,
                       onFavorite: onFavorite,

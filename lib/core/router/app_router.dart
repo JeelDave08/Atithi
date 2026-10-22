@@ -12,6 +12,7 @@ import '../../features/property/property.dart';
 import '../../features/property/property_screen.dart';
 import '../../property_experience.dart';
 import '../../screens/auth_screen.dart';
+import '../../screens/booking/booking_success_screen.dart';
 import '../../screens/forgot_password_screen.dart';
 import '../../screens/register_screen.dart';
 import '../../screens/splash_screen.dart';
@@ -83,7 +84,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/bookings',
         builder: (context, state) => const PropertyBookingsScreen(),
       ),
-      GoRoute(path: '/rooms', builder: (context, state) => const RoomsScreen()),
+      GoRoute(
+        path: '/booking-success',
+        builder: (context, state) {
+          final booking = state.extra as BookingSuccessData?;
+          if (booking == null) return const RoomsScreen();
+          return BookingSuccessScreen(data: booking);
+        },
+      ),
+      GoRoute(
+        path: '/rooms',
+        builder: (context, state) {
+          final selection = state.extra;
+          if (selection is RoomSearchSelection) {
+            return RoomsScreen(
+              checkIn: selection.checkIn,
+              checkOut: selection.checkOut,
+              adults: selection.adults,
+              children: selection.children,
+            );
+          }
+          return const RoomsScreen();
+        },
+      ),
       GoRoute(
         path: '/availability',
         builder: (context, state) => AvailabilityScreen(

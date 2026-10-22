@@ -11,13 +11,26 @@ import '../../models/room.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
 import '../../features/home/widgets/reveal_on_scroll.dart';
+import '../room_details/room_details_screen.dart';
+import '../booking/booking_screen.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
 import 'widgets/rooms_header.dart';
 import 'widgets/why_choose_atithi_card.dart';
 
 class RoomsScreen extends ConsumerStatefulWidget {
-  const RoomsScreen({super.key});
+  const RoomsScreen({
+    this.checkIn,
+    this.checkOut,
+    this.adults = 2,
+    this.children = 0,
+    super.key,
+  });
+
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final int adults;
+  final int children;
 
   @override
   ConsumerState<RoomsScreen> createState() => _RoomsScreenState();
@@ -25,15 +38,17 @@ class RoomsScreen extends ConsumerStatefulWidget {
 
 class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   static bool _didDebugRowCheck = false;
+  static const _pageSize = 20;
 
   final _service = RoomService();
+  final ScrollController _scrollController = ScrollController();
   List<Room> _rooms = [];
   List<String> _categories = [];
   Set<String> _favorites = {};
   final Set<String> _amenities = {};
-  final ScrollController _scrollController = ScrollController();
-  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0);
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   Object? _error;
   String? _debugError;
   String _category = 'All';
@@ -44,7 +59,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_updateParallaxOffset);
+    _scrollController.addListener(_onScroll);
     if (kDebugMode && !_didDebugRowCheck) {
       _didDebugRowCheck = true;
       unawaited(_debugRoomRowCount());
@@ -52,19 +67,24 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     _load();
   }
 
-  void _updateParallaxOffset() {
-    if (_scrollOffset.value != _scrollController.offset) {
-      _scrollOffset.value = _scrollController.offset;
-    }
-  }
-
   @override
   void dispose() {
     _scrollController
-      ..removeListener(_updateParallaxOffset)
+      ..removeListener(_onScroll)
       ..dispose();
-    _scrollOffset.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients ||
+        _loading ||
+        _loadingMore ||
+        !_hasMore) {
+      return;
+    }
+    if (_scrollController.position.extentAfter < 600) {
+      unawaited(_loadMore());
+    }
   }
 
   Future<void> _debugRoomRowCount() async {
@@ -79,7 +99,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadingMore = false;
+      _hasMore = true;
+    });
     try {
       final results = await Future.wait([
         _service.fetchCategories(),
@@ -89,6 +113,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           capacityRange: _capacity,
           amenities: _amenities,
           sort: _sort,
+          from: 0,
+          to: _pageSize - 1,
         ),
       ]);
       final user = FirebaseAuth.instance.currentUser;
@@ -99,6 +125,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       setState(() {
         _categories = results[0] as List<String>;
         _rooms = results[1] as List<Room>;
+        _hasMore = _rooms.length == _pageSize;
         _favorites = favorites;
         _error = null;
         _debugError = null;
@@ -114,6 +141,32 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         }
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _rooms.isEmpty) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextRooms = await _service.fetchRooms(
+        roomType: _category,
+        priceRange: _price,
+        capacityRange: _capacity,
+        amenities: _amenities,
+        sort: _sort,
+        from: _rooms.length,
+        to: _rooms.length + _pageSize - 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _rooms = [..._rooms, ...nextRooms];
+        _hasMore = nextRooms.length == _pageSize;
+        _loadingMore = false;
+      });
+    } catch (error, stack) {
+      debugPrint('Rooms pagination error: $error\n$stack');
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
     }
   }
 
@@ -190,8 +243,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final textScale = media.textScaler.scale(1).clamp(1.0, 1.15).toDouble();
     return MediaQuery(
-      data: media,
+      data: media.copyWith(textScaler: TextScaler.linear(textScale)),
       child: Scaffold(
         backgroundColor: AppColors.cream,
         body: SafeArea(
@@ -211,9 +265,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
 
                 return CustomScrollView(
                   controller: _scrollController,
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
                   slivers: [
                     SliverToBoxAdapter(
                       child: RoomsHeader(
@@ -281,24 +332,32 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         ),
                       )
                     else
-                      _buildRoomsGrid(maxWidth, contentWidth),
+                      _buildRoomsGrid(maxWidth, contentWidth, columns),
+                    if (_loadingMore)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.darkGold,
+                            ),
+                          ),
+                        ),
+                      ),
                     SliverToBoxAdapter(
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: contentWidth),
-                          child: RevealOnScroll(
-                            slideFrom: const Offset(-.15, 0),
-                            child: const Padding(
-                              padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
-                              child: WhyChooseAtithiCard(),
-                            ),
+                          child: const Padding(
+                            padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
+                            child: WhyChooseAtithiCard(),
                           ),
                         ),
                       ),
                     ),
                     SliverToBoxAdapter(
                       child: SizedBox(
-                        height: MediaQuery.paddingOf(context).bottom + 100,
+                        height: MediaQuery.paddingOf(context).bottom + 63,
                       ),
                     ),
                   ],
@@ -389,49 +448,87 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     ),
   );
 
-  // SliverList builds room cards lazily so each reveal runs as it enters view.
-  Widget _buildRoomsGrid(double maxWidth, double contentWidth) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final room = _rooms[index];
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: contentWidth),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                maxWidth > 700 ? 24 : 14,
-                index == 0 ? 0 : 12,
-                maxWidth > 700 ? 24 : 14,
-                0,
-              ),
-              child: RevealOnScroll(
-                delay: Duration(milliseconds: index * 120),
-                child: _PressScale(
-                  child: RoomCard(
-                    room: room,
-                    scrollOffset: _scrollOffset,
-                    isFavorite: _favorites.contains(room.id),
-                    onFavorite: () => _favorite(room),
-                    onDetails: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            RoomDetailsScreen(roomId: room.id, room: room),
-                      ),
-                    ),
-                    onBook: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => RoomBookingPlaceholder(room: room),
-                      ),
-                    ),
+  Widget _buildRoomsGrid(double maxWidth, double contentWidth, int columns) =>
+      SliverList(
+        delegate: SliverChildBuilderDelegate((context, rowIndex) {
+          final firstRoomIndex = rowIndex * columns;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: maxWidth > 700 ? 24 : 14,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const SizedBox(width: 12),
+                        Expanded(
+                          child: firstRoomIndex + column >= _rooms.length
+                              ? const SizedBox.shrink()
+                              : RevealOnScroll(
+                                  delay: Duration(milliseconds: rowIndex * 120),
+                                  child: _buildRoomCard(
+                                    context,
+                                    _rooms[firstRoomIndex + column],
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
             ),
+          );
+        }, childCount: (_rooms.length / columns).ceil()),
+      );
+
+  Widget _buildRoomCard(BuildContext context, Room room) {
+    final today = DateTime.now();
+    final checkIn =
+        widget.checkIn ?? DateTime(today.year, today.month, today.day);
+    final requestedCheckOut = widget.checkOut;
+    final checkOut =
+        requestedCheckOut != null && requestedCheckOut.isAfter(checkIn)
+        ? requestedCheckOut
+        : checkIn.add(const Duration(days: 1));
+    return RepaintBoundary(
+      key: ValueKey(room.id),
+      child: RoomCard(
+        key: ValueKey(room.id),
+        room: room,
+        isFavorite: _favorites.contains(room.id),
+        onFavorite: () => _favorite(room),
+        onDetails: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => RoomDetailsScreen(
+              roomId: room.id,
+              room: room,
+              checkIn: widget.checkIn,
+              checkOut: widget.checkOut,
+              adults: widget.adults,
+              children: widget.children,
+            ),
           ),
-        );
-      }, childCount: _rooms.length),
+        ),
+        onBook: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => BookingScreen(
+              room: room,
+              checkIn: checkIn,
+              checkOut: checkOut,
+              adults: widget.adults,
+              children: widget.children,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -651,105 +748,5 @@ class _SortLabel extends StatelessWidget {
         ),
       ),
     ],
-  );
-}
-
-class _PressScale extends StatefulWidget {
-  const _PressScale({required this.child});
-  final Widget child;
-
-  @override
-  State<_PressScale> createState() => _PressScaleState();
-}
-
-class _PressScaleState extends State<_PressScale> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) => Listener(
-    onPointerDown: (_) => setState(() => _pressed = true),
-    onPointerUp: (_) => setState(() => _pressed = false),
-    onPointerCancel: (_) => setState(() => _pressed = false),
-    child: AnimatedScale(
-      scale: _pressed && !MediaQuery.disableAnimationsOf(context) ? .97 : 1,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-      child: widget.child,
-    ),
-  );
-}
-
-class RoomDetailsScreen extends StatelessWidget {
-  const RoomDetailsScreen({
-    required this.roomId,
-    required this.room,
-    super.key,
-  });
-
-  final String roomId;
-  final Room room;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: Colors.white,
-      title: const Text('Room Details'),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(18),
-      children: [
-        if (room.imageUrls.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              room.imageUrls.first,
-              height: 230,
-              fit: BoxFit.cover,
-              errorBuilder: (_, error, stackTrace) =>
-                  const SizedBox(height: 230, child: Icon(Icons.bed_outlined)),
-            ),
-          ),
-        Text(
-          room.roomName ?? 'Room',
-          style: const TextStyle(
-            fontSize: 26,
-            color: AppColors.navy,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (room.description != null) Text(room.description!),
-        Text('₹${room.pricePerNight?.toStringAsFixed(0) ?? '—'} / night'),
-      ],
-    ),
-  );
-}
-
-class RoomBookingPlaceholder extends StatelessWidget {
-  const RoomBookingPlaceholder({required this.room, super.key});
-
-  final Room room;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: Colors.white,
-      title: const Text('Book your stay'),
-    ),
-    body: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Booking flow is not available yet.\n\n'
-          '${room.roomName ?? 'Room'} · '
-          '₹${room.pricePerNight?.toStringAsFixed(0) ?? '—'} / night',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.navy, fontSize: 18),
-        ),
-      ),
-    ),
   );
 }

@@ -9,12 +9,59 @@ class RoomService {
 
   final SupabaseClient _client;
 
+  Future<Room?> fetchRoomById(String roomId) async {
+    final row = await _client
+        .from('rooms')
+        .select()
+        .eq('id', roomId)
+        .eq('is_published', true)
+        .maybeSingle();
+    if (row == null) return null;
+
+    try {
+      return Room.fromJson(row);
+    } catch (error, stack) {
+      debugPrint('Could not parse room $roomId: $error\n$stack');
+      rethrow;
+    }
+  }
+
+  Future<bool> hasBookingConflict({
+    required String roomId,
+    required DateTime checkIn,
+    required DateTime checkOut,
+  }) async {
+    try {
+      final rows = await _client
+          .from('bookings')
+          .select('room_id')
+          .eq('room_id', roomId)
+          .neq('booking_status', 'cancelled')
+          .lt('check_in', _dateOnly(checkOut))
+          .gt('check_out', _dateOnly(checkIn))
+          .limit(1);
+      return rows.isNotEmpty;
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Room booking conflict check ignored: $error');
+      }
+      return false;
+    }
+  }
+
+  String _dateOnly(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
   Future<List<Room>> fetchRooms({
     String? roomType,
     String? priceRange,
     String? capacityRange,
     Set<String> amenities = const {},
     String sort = 'Recommended',
+    int from = 0,
+    int to = 19,
   }) async {
     var query = _client.from('rooms').select().eq('is_published', true);
 
@@ -42,7 +89,9 @@ class RoomService {
     }
 
     // Keep the recommended database order for this screen.
-    final rows = await query.order('sort_order', ascending: true);
+    final rows = await query
+        .order('sort_order', ascending: true)
+        .range(from, to);
     final rooms = <Room>[];
     for (final row in rows) {
       try {
