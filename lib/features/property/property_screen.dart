@@ -53,7 +53,7 @@ class _PropertyScreenState extends State<PropertyScreen> {
                         height: 300,
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: Palette.gold.withOpacity(.7),
+                            color: Palette.gold.withValues(alpha: .7),
                             width: 1.5,
                           ),
                           borderRadius: BorderRadius.vertical(
@@ -111,7 +111,7 @@ class _PropertyScreenState extends State<PropertyScreen> {
                               decoration: BoxDecoration(
                                 color: i == _photo
                                     ? Palette.gold
-                                    : Palette.cream.withOpacity(.4),
+                                    : Palette.cream.withValues(alpha: .4),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -230,7 +230,7 @@ class _PropertyScreenState extends State<PropertyScreen> {
       height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Palette.gold.withOpacity(.4)),
+        border: Border.all(color: Palette.gold.withValues(alpha: .4)),
       ),
       child: Icon(i, color: Palette.cream, size: 20),
     ),
@@ -240,7 +240,7 @@ class _PropertyScreenState extends State<PropertyScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 10, color: Palette.grey.withOpacity(.8)),
+          style: TextStyle(fontSize: 10, color: Palette.grey.withValues(alpha: .8)),
         ),
         const SizedBox(height: 5),
         Text(

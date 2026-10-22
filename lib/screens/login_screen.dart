@@ -49,8 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         showAuthMessage(context, 'Unable to sign in. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -84,11 +85,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) showAuthMessage(context, error.toString());
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isSubmitting = false;
           _googleSignInPending = false;
         });
+      }
     }
   }
 

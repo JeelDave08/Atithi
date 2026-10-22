@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -14,20 +15,19 @@ class RoomCard extends StatelessWidget {
     required this.onFavorite,
     required this.onDetails,
     required this.onBook,
+    this.scrollOffset,
     super.key,
   });
   final Room room;
   final bool isFavorite;
   final VoidCallback onFavorite, onDetails, onBook;
+  final ValueListenable<double>? scrollOffset;
   @override
   Widget build(BuildContext context) {
     final available = room.status == 'available';
-    final limited = available && room.unitsLeft != null && room.unitsLeft! <= 2;
-    final state = available
-        ? (limited ? 'Limited Availability' : 'Available')
-        : 'Sold Out';
+    final state = available ? 'Available' : 'Sold out';
     final stateColor = available
-        ? (limited ? AppColors.darkGold : const Color(0xFF25804B))
+        ? const Color(0xFF25804B)
         : const Color(0xFFB53838);
     final info = [
       if (room.capacity != null && room.capacity! > 0)
@@ -35,7 +35,7 @@ class RoomCard extends StatelessWidget {
       if (room.bedInfo?.trim().isNotEmpty == true) room.bedInfo!,
       if (room.sizeSqft != null && room.sizeSqft! > 0) '${room.sizeSqft} sq.ft',
     ];
-    final amenities = room.amenities.take(4).toList();
+    final amenities = room.amenities.take(5).toList();
     return Material(
       color: AppColors.cream,
       borderRadius: BorderRadius.circular(22),
@@ -47,11 +47,27 @@ class RoomCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RoomImageCarousel(
-              room: room,
-              isFavorite: isFavorite,
-              onFavorite: onFavorite,
-            ),
+            if (scrollOffset == null)
+              RoomImageCarousel(
+                room: room,
+                isFavorite: isFavorite,
+                onFavorite: onFavorite,
+              )
+            // Scroll movement repaints only the image instead of rebuilding the list.
+            else
+              ValueListenableBuilder<double>(
+                valueListenable: scrollOffset!,
+                builder: (context, offset, _) => ClipRect(
+                  child: Transform.translate(
+                    offset: Offset(0, (offset * .035) % 12 - 6),
+                    child: RoomImageCarousel(
+                      room: room,
+                      isFavorite: isFavorite,
+                      onFavorite: onFavorite,
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
               child: Column(
@@ -131,9 +147,8 @@ class RoomCard extends StatelessWidget {
                   if (amenities.isNotEmpty) ...[
                     const SizedBox(height: 9),
                     Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      spacing: 4,
-                      runSpacing: 5,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: amenities
                           .map((a) => AmenityChip(amenity: a))
                           .toList(),
@@ -172,25 +187,24 @@ class RoomCard extends StatelessWidget {
                             fontSize: 9,
                           ),
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircleAvatar(
-                              radius: 3,
-                              backgroundColor: stateColor,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: stateColor.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            state,
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: stateColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              state,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: stateColor,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -223,7 +237,7 @@ class RoomCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton(
                           onPressed: available ? onBook : null,

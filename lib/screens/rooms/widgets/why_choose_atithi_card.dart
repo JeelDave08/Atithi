@@ -24,14 +24,31 @@ class WhyChooseAtithiCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 15),
-        const Wrap(
-          runSpacing: 15,
-          children: [
-            _Benefit(Icons.king_bed_outlined, 'Premium Rooms & Suites'),
-            _Benefit(Icons.verified_user_outlined, 'Safe & Secure Stay'),
-            _Benefit(Icons.support_agent, '24/7 Support'),
-            _Benefit(Icons.local_offer_outlined, 'Best Rates'),
-          ],
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 4,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisExtent: 170,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+          ),
+          itemBuilder: (context, index) => _Benefit(
+            index: index,
+            icon: const [
+              Icons.king_bed_outlined,
+              Icons.verified_user_outlined,
+              Icons.support_agent,
+              Icons.local_offer_outlined,
+            ][index],
+            label: const [
+              'Premium Suites',
+              'Safe & Secure',
+              '24/7 Support',
+              'Best Rates',
+            ][index],
+          ),
         ),
         const SizedBox(height: 18),
         Container(
@@ -71,30 +88,64 @@ class WhyChooseAtithiCard extends StatelessWidget {
 }
 
 class _Benefit extends StatelessWidget {
-  const _Benefit(this.icon, this.label);
+  const _Benefit({
+    required this.index,
+    required this.icon,
+    required this.label,
+  });
+  final int index;
   final IconData icon;
   final String label;
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: MediaQuery.sizeOf(context).width * .39,
-    child: Row(
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .06),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.gold.withValues(alpha: .2)),
+    ),
+    child: Stack(
       children: [
-        CircleAvatar(
-          radius: 17,
-          backgroundColor: Colors.white.withValues(alpha: .1),
-          child: Icon(icon, color: AppColors.gold, size: 18),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
+        Positioned(
+          top: 8,
+          right: 10,
           child: Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+            '0${index + 1}',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: .17),
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: .16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: AppColors.gold, size: 28),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

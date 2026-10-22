@@ -96,6 +96,7 @@ class AuthService implements AuthRepository {
     }
   }
 
+  @override
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
   Future<String?> currentUserId() async => _auth.currentUser?.uid;
@@ -114,11 +115,12 @@ class AuthService implements AuthRepository {
         password: password,
       );
       final user = credential.user;
-      if (user == null)
+      if (user == null) {
         throw const AuthFailure(
           AuthFailureCode.unknown,
           'Account creation failed. Please try again.',
         );
+      }
       await user.updateDisplayName(name.trim());
       final now = FieldValue.serverTimestamp();
       await _firestore.collection('users').doc(user.uid).set({
@@ -164,6 +166,7 @@ class AuthService implements AuthRepository {
     }
   }
 
+  @override
   Future<GoogleSignInResult> signInWithGoogle() async {
     try {
       await initializeGoogleSignIn();
@@ -275,6 +278,7 @@ class AuthService implements AuthRepository {
     }
   }
 
+  @override
   Future<void> sendPasswordReset(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());

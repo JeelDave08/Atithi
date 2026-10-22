@@ -11,6 +11,12 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (!SupabaseConfig.isConfigured) {
+    throw StateError(
+      'Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY with --dart-define.',
+    );
+  }
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await Supabase.initialize(

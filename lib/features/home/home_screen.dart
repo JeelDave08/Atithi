@@ -29,7 +29,7 @@ class LegacyHomeScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        Palette.gold.withOpacity(.22),
+                        Palette.gold.withValues(alpha: .22),
                         Colors.transparent,
                       ],
                     ),
@@ -51,7 +51,7 @@ class LegacyHomeScreen extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11 * scale,
                                 letterSpacing: 1.1,
-                                color: Palette.cream.withOpacity(.65),
+                                color: Palette.cream.withValues(alpha: .65),
                               ),
                             ),
                             const SizedBox(height: 5),
@@ -257,7 +257,7 @@ class LegacyHomeScreen extends StatelessWidget {
         ArchContainer(
           top: 35,
           bottom: 10,
-          borderColor: Palette.gold.withOpacity(.53),
+          borderColor: Palette.gold.withValues(alpha: .53),
           color: Colors.transparent,
           child: SizedBox(
             width: 70 * scale,

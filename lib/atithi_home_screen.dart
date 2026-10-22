@@ -1,16 +1,23 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
+import 'theme/app_colors.dart';
+import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
 
-const _cream = Color(0xFFFBF7EF);
-const _cardCream = Color(0xFFFFFCF6);
-const _navy = Color(0xFF102B46);
-const _primaryNavy = Color(0xFF173A59);
-const _gold = Color(0xFFC49A45);
-const _lightGold = Color(0xFFE6C786);
-const _mainText = Color(0xFF142C46);
+const _cream = AppColors.cream;
+const _cardCream = AppColors.cream;
+const _navy = AppColors.navy;
+const _primaryNavy = AppColors.navy;
+const _gold = AppColors.gold;
+const _lightGold = AppColors.gold;
+const _mainText = AppColors.navy;
 
 class AtithiHomeScreen extends StatefulWidget {
   const AtithiHomeScreen({super.key});
@@ -20,6 +27,7 @@ class AtithiHomeScreen extends StatefulWidget {
 }
 
 class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
+  final ScrollController _homeScrollController = ScrollController();
   late DateTime _checkIn = _dateOnly(DateTime.now());
   late DateTime _checkOut = _dateOnly(DateTime.now())
       .add(const Duration(days: 1));
@@ -28,6 +36,12 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
 
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
+
+  @override
+  void dispose() {
+    _homeScrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _selectCheckIn() async {
     final today = _dateOnly(DateTime.now());
@@ -117,6 +131,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
     body: SafeArea(
       bottom: false,
       child: CustomScrollView(
+        controller: _homeScrollController,
         slivers: [
           SliverToBoxAdapter(
             child: _HomeHeader(
@@ -139,27 +154,34 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: _HeroBanner(onTap: _openRoomListing),
+              child: _HeroBanner(
+                onTap: _openRoomListing,
+                scrollController: _homeScrollController,
+              ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              child: _BookingSearchCard(
-                checkIn: _checkIn,
-                checkOut: _checkOut,
-                adults: _adults,
-                children: _children,
-                onCheckInTap: _selectCheckIn,
-                onCheckOutTap: _selectCheckOut,
-                onAdultsChange: (value) =>
-                    _changeCount(adults: true, change: value),
-                onChildrenChange: (value) =>
-                    _changeCount(adults: false, change: value),
-                onSearch: _openRoomListing,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Transform.translate(
+                offset: const Offset(0, -28),
+                child: _BookingSearchCard(
+                  checkIn: _checkIn,
+                  checkOut: _checkOut,
+                  adults: _adults,
+                  children: _children,
+                  onCheckInTap: _selectCheckIn,
+                  onCheckOutTap: _selectCheckOut,
+                  onAdultsChange: (value) =>
+                      _changeCount(adults: true, change: value),
+                  onChildrenChange: (value) =>
+                      _changeCount(adults: false, change: value),
+                  onSearch: _openRoomListing,
+                ),
               ),
             ),
           ),
+          const SliverToBoxAdapter(child: _TrustStrip()),
           SliverToBoxAdapter(
             child: _Section(
               title: 'Explore Atithi',
@@ -219,7 +241,9 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
               child: _ContactCard(onTap: () => context.push('/contact')),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 18)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 100),
+          ),
         ],
       ),
     ),
@@ -237,124 +261,274 @@ class _HomeHeader extends StatelessWidget {
   final ValueChanged<String> onMenuSelected;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 10, 12, 8),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 124,
-          height: 48,
-          child: Image.asset(
-            'assets/images/atithi_logo.png',
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => Text(
-              'ATITHI',
-              style: GoogleFonts.playfairDisplay(
-                color: _navy,
-                fontSize: 25,
-                fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => RevealOnScroll(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 12, 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 124,
+            height: 48,
+            child: Image.asset(
+              'assets/images/atithi_logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Text(
+                'ATITHI',
+                style: GoogleFonts.playfairDisplay(
+                  color: _navy,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
-        ),
-        const Spacer(),
-        IconButton(
-          tooltip: 'Notifications',
-          onPressed: onNotifications,
-          icon: const Icon(Icons.notifications_none_rounded, color: _navy),
-        ),
-        PopupMenuButton<String>(
-          tooltip: 'Open menu',
-          onSelected: onMenuSelected,
-          color: _cardCream,
-          icon: const Icon(Icons.menu_rounded, color: _navy),
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
-            PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
-            PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
-          ],
-        ),
-      ],
+          const Spacer(),
+          _PulsingBell(onPressed: onNotifications),
+          PopupMenuButton<String>(
+            tooltip: 'Open menu',
+            onSelected: onMenuSelected,
+            color: _cardCream,
+            icon: const Icon(Icons.menu_rounded, color: _navy),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
+              PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
+              PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }
 
-class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.onTap});
+// Flutter-only doorway scene keeps animation assets and backend logic unchanged.
+class _HeroBanner extends StatefulWidget {
+  const _HeroBanner({required this.onTap, required this.scrollController});
 
   final VoidCallback onTap;
+  final ScrollController scrollController;
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<PropertyContent?>(
-    future: const PropertyContentRepository().getActiveProperty(),
-    builder: (context, snapshot) {
-      final property = snapshot.data;
+  State<_HeroBanner> createState() => _HeroBannerState();
+}
+
+class _HeroBannerState extends State<_HeroBanner>
+    with TickerProviderStateMixin {
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+  late final AnimationController _ambience = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 18),
+  )..repeat(reverse: true);
+  late final AnimationController _glow = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2500),
+  )..repeat(reverse: true);
+  bool _reducedMotion = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (reduced != _reducedMotion) {
+      _reducedMotion = reduced;
+      if (reduced) {
+        _intro.value = 1;
+        _ambience.stop();
+        _glow.stop();
+      } else {
+        _intro.forward(from: 0);
+        _ambience.repeat(reverse: true);
+        _glow.repeat(reverse: true);
+      }
+    }
+    if (!_intro.isAnimating && _intro.value == 0 && !reduced) {
+      _intro.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    _ambience.dispose();
+    _glow.dispose();
+    super.dispose();
+  }
+
+  void _replay() {
+    if (_reducedMotion) return;
+    _intro.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: Listenable.merge([
+      _intro,
+      _ambience,
+      _glow,
+      widget.scrollController,
+    ]),
+    builder: (context, _) {
+      final scroll =
+          !MediaQuery.disableAnimationsOf(context) &&
+              widget.scrollController.hasClients
+          ? widget.scrollController.offset
+          : 0.0;
+      final hour = DateTime.now().hour;
+      final greeting = hour >= 5 && hour < 12
+          ? 'Good Morning'
+          : hour >= 17 && hour < 21
+          ? 'Good Evening'
+          : 'Good Night';
+      final guestName = FirebaseAuth.instance.currentUser?.displayName
+          ?.trim()
+          .split(' ')
+          .first;
       return ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(36),
         child: SizedBox(
-          height: 244,
+          height: 440,
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const _HotelImageFallback(),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.navy,
+                      Color.lerp(_navy, _primaryNavy, _ambience.value)!,
+                      _primaryNavy,
+                    ],
+                  ),
+                ),
+              ),
+              Transform.translate(
+                offset: Offset(0, scroll * .08),
+                child: _HeroStars(opacity: .38 + _ambience.value * .3),
+              ),
+              Positioned(
+                bottom: 72,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: const Size(170, 190),
+                    painter: _DoorwayPainter(glow: _glow.value),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: (38 + (math.sin(_ambience.value * math.pi) * 18))
+                    .toDouble(),
+                top: (35 + (math.cos(_ambience.value * math.pi) * 8))
+                    .toDouble(),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _cream,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _lightGold.withValues(alpha: .42),
+                        blurRadius: 28,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Transform.translate(
+                  offset: Offset(0, scroll * .2),
+                  child: const _HeroSkyline(),
+                ),
+              ),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.bottomLeft,
-                    end: Alignment.topRight,
-                    colors: [Color(0xE6102B46), Color(0x00102B46)],
-                    stops: [0, .9],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xD90B2347), Color(0x000B2347)],
+                    stops: [0, .78],
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+                padding: const EdgeInsets.fromLTRB(22, 58, 22, 22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      property?.name.isNotEmpty == true
-                          ? property!.name
-                          : 'Welcome to Atithi',
+                      guestName == null || guestName.isEmpty
+                          ? '$greeting, Guest'
+                          : 'Namaste, $guestName',
+                      style: const TextStyle(
+                        color: _lightGold,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Atithi Devo Bhava',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.playfairDisplay(
                         color: Colors.white,
-                        fontSize: 30,
+                        fontSize: 38,
                         fontWeight: FontWeight.w600,
                         height: 1.08,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      property?.description.isNotEmpty == true
-                          ? property!.description
-                          : 'Discover a comfortable stay with Atithi.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Where every guest is family.',
+                      style: TextStyle(
+                        color: _lightGold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 4),
+                    const _RotatingHeroLine(),
                     const SizedBox(height: 14),
                     Material(
                       color: _lightGold,
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
-                        onTap: onTap,
-                        child: const Padding(
+                        onTap: widget.onTap,
+                        child: Padding(
                           padding: EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 9,
                           ),
-                          child: Text(
-                            'Find your stay',
-                            style: TextStyle(
-                              color: _navy,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Find your stay',
+                                style: TextStyle(
+                                  color: _navy,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Transform.translate(
+                                offset: Offset(_glow.value * 3, 0),
+                                child: const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: _navy,
+                                  size: 16,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -362,11 +536,378 @@ class _HeroBanner extends StatelessWidget {
                   ],
                 ),
               ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _intro,
+                    builder: (context, _) => Row(
+                      children: [
+                        Expanded(
+                          child: Transform.translate(
+                            offset: Offset(
+                              -MediaQuery.sizeOf(context).width *
+                                  .5 *
+                                  _intro.value,
+                              0,
+                            ),
+                            child: const _HeroDoor(isLeft: true),
+                          ),
+                        ),
+                        Expanded(
+                          child: Transform.translate(
+                            offset: Offset(
+                              MediaQuery.sizeOf(context).width *
+                                  .5 *
+                                  _intro.value,
+                              0,
+                            ),
+                            child: const _HeroDoor(isLeft: false),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 10,
+                bottom: 8,
+                child: IconButton(
+                  onPressed: _replay,
+                  tooltip: 'Tap to replay',
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  style: IconButton.styleFrom(foregroundColor: _lightGold),
+                ),
+              ),
             ],
           ),
         ),
       );
     },
+  );
+}
+
+class _HeroDoor extends StatelessWidget {
+  const _HeroDoor({required this.isLeft});
+  final bool isLeft;
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
+        end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
+        colors: const [_navy, _primaryNavy],
+      ),
+      border: Border.all(color: _lightGold.withValues(alpha: .5), width: 1.2),
+    ),
+    child: Center(
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: _lightGold,
+          shape: BoxShape.circle,
+        ),
+      ),
+    ),
+  );
+}
+
+class _DoorwayPainter extends CustomPainter {
+  const _DoorwayPainter({required this.glow});
+  final double glow;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final arch = Path()
+      ..moveTo(size.width * .18, size.height)
+      ..lineTo(size.width * .18, size.height * .45)
+      ..cubicTo(
+        size.width * .18,
+        size.height * .06,
+        size.width * .82,
+        size.height * .06,
+        size.width * .82,
+        size.height * .45,
+      )
+      ..lineTo(size.width * .82, size.height)
+      ..close();
+    final haze = Paint()
+      ..color = _gold.withValues(alpha: .11 + glow * .12)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + glow * 10);
+    canvas.drawPath(arch, haze);
+    final fill = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [_gold, _gold, _navy],
+      ).createShader(Offset.zero & size);
+    canvas.drawPath(arch, fill);
+    final frame = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = _gold.withValues(alpha: .75 + glow * .25);
+    canvas.drawPath(arch, frame);
+    final seam = Paint()
+      ..color = _navy.withValues(alpha: .45)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(size.width * .5, size.height * .48),
+      Offset(size.width * .5, size.height),
+      seam,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DoorwayPainter oldDelegate) =>
+      oldDelegate.glow != glow;
+}
+
+class _HeroStars extends StatelessWidget {
+  const _HeroStars({required this.opacity});
+  final double opacity;
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Stack(
+      children: List.generate(50, (i) {
+        final x = ((i * 47 + 13) % 97) / 100;
+        final y = ((i * 31 + 9) % 48) / 100;
+        return Positioned(
+          left: MediaQuery.sizeOf(context).width * x,
+          top: 440 * y,
+          child: Opacity(
+            opacity: opacity * (.55 + (i % 4) * .1),
+            child: Icon(
+              Icons.circle,
+              size: i % 6 == 0 ? 3 : 2,
+              color: _lightGold,
+            ),
+          ),
+        );
+      }),
+    ),
+  );
+}
+
+class _TrustStrip extends StatelessWidget {
+  const _TrustStrip();
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
+      decoration: BoxDecoration(
+        color: _cardCream,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _gold.withValues(alpha: .32)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Expanded(
+            child: _TrustItem(
+              icon: Icons.star_rounded,
+              label: 'Rating',
+              value: '4.8',
+            ),
+          ),
+          Expanded(
+            child: _TrustItem(
+              icon: Icons.support_agent_rounded,
+              label: 'Support',
+              value: '24/7',
+            ),
+          ),
+          Expanded(
+            child: _TrustItem(
+              icon: Icons.verified_user_outlined,
+              label: 'Cancellation',
+              value: 'Free',
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _TrustItem extends StatelessWidget {
+  const _TrustItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Icon(icon, color: _gold, size: 17),
+      const SizedBox(height: 3),
+      if (label == 'Rating')
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 4.8),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 900),
+          builder: (context, count, _) => Text(
+            count.toStringAsFixed(1),
+            maxLines: 1,
+            style: const TextStyle(
+              color: _navy,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        )
+      else
+        Text(
+          value,
+          maxLines: 1,
+          style: const TextStyle(
+            color: _navy,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: _mainText, fontSize: 9),
+      ),
+    ],
+  );
+}
+
+class _HeroSkyline extends StatelessWidget {
+  const _HeroSkyline();
+  static const List<double> _heights = [56, 88, 70, 108, 82, 62, 96, 58];
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.bottomCenter,
+    child: SizedBox(
+      height: 125,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(
+          _heights.length,
+          (i) => Expanded(
+            child: Container(
+              height: _heights[i],
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: _navy.withValues(alpha: .9),
+                border: i == 3
+                    ? Border.all(
+                        color: _gold.withValues(alpha: .75),
+                        width: 1.3,
+                      )
+                    : null,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(5),
+                ),
+              ),
+              child: i == 3
+                  ? Column(
+                      children: [
+                        const SizedBox(height: 5),
+                        Text(
+                          'ATITHI',
+                          style: TextStyle(
+                            color: _lightGold,
+                            fontSize: 7,
+                            letterSpacing: 1,
+                            shadows: [Shadow(color: _gold, blurRadius: 8)],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 18,
+                          height: 25,
+                          decoration: BoxDecoration(
+                            color: _gold.withValues(alpha: .5),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: List.generate(
+                          4,
+                          (_) => Container(
+                            width: 5,
+                            height: 7,
+                            color: _gold.withValues(alpha: .55),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _RotatingHeroLine extends StatefulWidget {
+  const _RotatingHeroLine();
+  @override
+  State<_RotatingHeroLine> createState() => _RotatingHeroLineState();
+}
+
+class _RotatingHeroLineState extends State<_RotatingHeroLine> {
+  static const _words = [
+    'comfortable rooms',
+    'friendly service',
+    'a relaxing stay',
+    'warm hospitality',
+  ];
+  int _index = 0;
+  Timer? _timer;
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
+      if (mounted && !MediaQuery.disableAnimationsOf(context)) {
+        setState(() => _index = (_index + 1) % _words.length);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 350),
+    transitionBuilder: (child, animation) => SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, .25),
+        end: Offset.zero,
+      ).animate(animation),
+      child: FadeTransition(opacity: animation, child: child),
+    ),
+    child: Text(
+      'Enjoy ${_words[_index]}',
+      key: ValueKey(_index),
+      style: const TextStyle(
+        color: _lightGold,
+        fontWeight: FontWeight.w600,
+        fontSize: 15,
+      ),
+    ),
   );
 }
 
@@ -411,12 +952,41 @@ class _BookingSearchCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Plan your stay',
-          style: GoogleFonts.playfairDisplay(
-            color: _mainText,
-            fontSize: 21,
-            fontWeight: FontWeight.w600,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _navy,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'KEY CARD',
+                      style: TextStyle(
+                        color: _lightGold,
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Plan your stay',
+                      style: GoogleFonts.playfairDisplay(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.nfc_rounded, color: _lightGold, size: 27),
+            ],
           ),
         ),
         const SizedBox(height: 14),
@@ -468,15 +1038,15 @@ class _BookingSearchCard extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onSearch,
             style: FilledButton.styleFrom(
-              backgroundColor: _navy,
-              foregroundColor: _lightGold,
+              backgroundColor: _gold,
+              foregroundColor: _navy,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
             ),
             icon: const Icon(Icons.search_rounded),
             label: const Text(
-              'Search Rooms',
+              'Search',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
           ),
@@ -520,12 +1090,12 @@ class _DateChoice extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    MaterialLocalizations.of(context).formatMediumDate(date),
+                    DateFormat('EEE, d MMM').format(date),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: _mainText,
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -646,35 +1216,50 @@ class _Section extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.playfairDisplay(
-                  color: _mainText,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            if (actionLabel != null)
-              TextButton(
-                onPressed: onAction,
-                style: TextButton.styleFrom(
-                  foregroundColor: _gold,
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+        RevealOnScroll(
+          slideFrom: const Offset(-.15, 0),
+          child: Row(
+            children: [
+              Expanded(
                 child: Text(
-                  actionLabel!,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  title,
+                  style: GoogleFonts.playfairDisplay(
+                    color: _mainText,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-          ],
+              if (actionLabel != null)
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    foregroundColor: _gold,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    actionLabel!,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
+          ),
         ),
-        const SizedBox(height: 13),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 38,
+            height: 3,
+            decoration: BoxDecoration(
+              color: _gold,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         child,
       ],
     ),
@@ -687,10 +1272,17 @@ class _IconLabel {
   final String label;
 }
 
-class _QuickAccessRow extends StatelessWidget {
+class _QuickAccessRow extends StatefulWidget {
   const _QuickAccessRow({required this.onTap});
 
   final ValueChanged<String> onTap;
+
+  @override
+  State<_QuickAccessRow> createState() => _QuickAccessRowState();
+}
+
+class _QuickAccessRowState extends State<_QuickAccessRow> {
+  int _selected = -1;
 
   @override
   Widget build(BuildContext context) {
@@ -711,18 +1303,30 @@ class _QuickAccessRow extends StatelessWidget {
           width: 67,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: () => onTap(items[index].label),
+            onTap: () {
+              setState(() => _selected = index);
+              widget.onTap(items[index].label);
+            },
             child: Column(
               children: [
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutBack,
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _cardCream,
+                    color: _selected == index ? _navy : _cardCream,
                     border: Border.all(color: _lightGold, width: 1.2),
                   ),
-                  child: Icon(items[index].icon, color: _navy, size: 24),
+                  child: Transform.rotate(
+                    angle: _selected == index ? -.14 : 0,
+                    child: Icon(
+                      items[index].icon,
+                      color: _selected == index ? _lightGold : _navy,
+                      size: 24,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -754,33 +1358,147 @@ class _ContactCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(17),
     decoration: BoxDecoration(
-      color: _cardCream,
+      color: _navy,
       borderRadius: BorderRadius.circular(18),
       border: Border.all(color: _lightGold.withValues(alpha: .5)),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Stack(
       children: [
-        const Text(
-          'View property contact details or send a message to the team.',
-          style: TextStyle(color: _mainText, fontSize: 14, height: 1.5),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: onTap,
-            style: FilledButton.styleFrom(
-              backgroundColor: _navy,
-              foregroundColor: _lightGold,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(13),
+        Positioned(
+          right: -24,
+          top: -40,
+          child: Container(
+            width: 115,
+            height: 115,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _lightGold.withValues(alpha: .12),
+                width: 2,
               ),
             ),
-            child: const Text('Get in Touch'),
           ),
         ),
+        Positioned(
+          right: -4,
+          top: -20,
+          child: Container(
+            width: 75,
+            height: 75,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _lightGold.withValues(alpha: .12),
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.phone_in_talk_rounded,
+                  color: _lightGold,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'View property contact details or send a message to the team.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _lightGold,
+                  foregroundColor: _navy,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                ),
+                child: const Text(
+                  'Get in Touch',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
+    ),
+  );
+}
+
+class _PulsingBell extends StatefulWidget {
+  const _PulsingBell({required this.onPressed});
+  final VoidCallback onPressed;
+  @override
+  State<_PulsingBell> createState() => _PulsingBellState();
+}
+
+class _PulsingBellState extends State<_PulsingBell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat(reverse: true);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'Notifications',
+    onPressed: widget.onPressed,
+    icon: AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Transform.rotate(
+            angle: math.sin(_pulse.value * math.pi * 2) * .08,
+            child: const Icon(Icons.notifications_none_rounded, color: _navy),
+          ),
+          Positioned(
+            right: -1,
+            top: -1,
+            child: Container(
+              width: 8 + _pulse.value * 2,
+              height: 8 + _pulse.value * 2,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _gold,
+                border: Border.all(color: _cardCream, width: 1),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -789,10 +1507,12 @@ class _HomeBottomNavigation extends StatelessWidget {
   const _HomeBottomNavigation();
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+    decoration: BoxDecoration(
       color: _cardCream,
-      boxShadow: [
+      borderRadius: BorderRadius.circular(32),
+      boxShadow: const [
         BoxShadow(
           color: Color(0x160F2943),
           blurRadius: 12,
@@ -918,24 +1638,6 @@ class AtithiDestinationScreen extends StatelessWidget {
           ),
         ),
       ),
-    ),
-  );
-}
-
-class _HotelImageFallback extends StatelessWidget {
-  const _HotelImageFallback();
-
-  @override
-  Widget build(BuildContext context) => const DecoratedBox(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [_primaryNavy, _navy],
-      ),
-    ),
-    child: Center(
-      child: Icon(Icons.hotel_rounded, color: _lightGold, size: 38),
     ),
   );
 }

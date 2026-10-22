@@ -163,8 +163,9 @@ String? validateEmailAddress(String? value) {
   final emailPattern = RegExp(
     r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
   );
-  if (!emailPattern.hasMatch(email))
+  if (!emailPattern.hasMatch(email)) {
     return 'Please enter a valid email address.';
+  }
   return null;
 }
 

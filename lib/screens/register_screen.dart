@@ -79,11 +79,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         showAuthMessage(
           context,
           'Unable to create your account. Please try again.',
         );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

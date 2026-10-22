@@ -1,19 +1,24 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models/room.dart';
+import 'theme/app_colors.dart';
 
-const _experienceCream = Color(0xFFFBF7EF);
-const _experienceCard = Color(0xFFFFFCF6);
-const _experienceNavy = Color(0xFF102B46);
-const _experienceGold = Color(0xFFC49A45);
-const _experienceLightGold = Color(0xFFE6C786);
+const _experienceCream = AppColors.cream;
+const _experienceCard = AppColors.cream;
+const _experienceNavy = AppColors.navy;
+const _experienceGold = AppColors.gold;
+const _experienceLightGold = AppColors.gold;
 
 class PropertyContent {
   const PropertyContent({
@@ -65,6 +70,47 @@ class PropertyService {
       iconName: _stringValue(data['image_url']),
     );
   }
+}
+
+class ServiceItem {
+  const ServiceItem({
+    required this.icon,
+    required this.name,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String name;
+  final String description;
+
+  factory ServiceItem.fromPropertyService(PropertyService service) {
+    final normalized = service.name.toLowerCase();
+    final icon = switch (normalized) {
+      final name when name.contains('housekeep') =>
+        Icons.cleaning_services_rounded,
+      final name when name.contains('laundry') =>
+        Icons.local_laundry_service_rounded,
+      final name when name.contains('wifi') => Icons.wifi_rounded,
+      final name when name.contains('room service') =>
+        Icons.room_service_rounded,
+      final name when name.contains('airport') || name.contains('pickup') =>
+        Icons.local_taxi_rounded,
+      final name when name.contains('restaurant') => Icons.restaurant_rounded,
+      _ => Icons.star_rounded,
+    };
+    return ServiceItem(
+      icon: icon,
+      name: service.name,
+      description: service.description,
+    );
+  }
+}
+
+class AboutStats {
+  const AboutStats({required this.rooms, required this.averageRating});
+
+  final int rooms;
+  final double? averageRating;
 }
 
 class PropertyRoom {
@@ -167,6 +213,32 @@ class PropertyContentRepository {
           .toList();
     } catch (error, stackTrace) {
       _logPropertyDataFailure('Load active services', error, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<List<ServiceItem>> getServiceItems() async => (await getServices())
+      .take(8)
+      .map(ServiceItem.fromPropertyService)
+      .toList();
+
+  Future<AboutStats> getAboutStats() async {
+    try {
+      final rows = await _supabase
+          .from('rooms')
+          .select('id,rating')
+          .eq('is_published', true);
+      final ratings = rows
+          .map((row) => num.tryParse(row['rating']?.toString() ?? ''))
+          .whereType<num>()
+          .map((rating) => rating.toDouble())
+          .toList();
+      final average = ratings.isEmpty
+          ? null
+          : ratings.reduce((sum, rating) => sum + rating) / ratings.length;
+      return AboutStats(rooms: rows.length, averageRating: average);
+    } catch (error, stackTrace) {
+      _logPropertyDataFailure('Load About stats', error, stackTrace);
       rethrow;
     }
   }
@@ -311,55 +383,883 @@ class _PropertyAboutScreenState extends State<PropertyAboutScreen> {
             message: 'Property information is not available yet.',
           );
         }
-        return _AboutContent(property: property);
+        return _AboutContent(property: property, repository: widget.repository);
       },
     ),
   );
 }
 
-class _AboutContent extends StatelessWidget {
-  const _AboutContent({required this.property});
+class _AboutContent extends StatefulWidget {
+  const _AboutContent({required this.property, required this.repository});
+
   final PropertyContent property;
+  final PropertyContentRepository repository;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-    children: [
-      _PropertyImage(url: null, height: 230),
-      const SizedBox(height: 24),
-      _AnimatedSection(
-        delay: Duration.zero,
-        child: Text(
-          property.name.isEmpty
-              ? 'Experience Comfort, Redefined'
-              : property.name,
-          style: const TextStyle(
-            color: _experienceNavy,
-            fontSize: 27,
-            fontWeight: FontWeight.w700,
+  State<_AboutContent> createState() => _AboutContentState();
+}
+
+class _AboutContentState extends State<_AboutContent>
+    with TickerProviderStateMixin {
+  late final AnimationController _entranceController;
+  late final AnimationController _shimmerController;
+  late Future<AboutStats> _statsFuture;
+  bool? _motionDisabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = widget.repository.getAboutStats();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    );
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.of(context).disableAnimations;
+    if (_motionDisabled == disabled) return;
+    _motionDisabled = disabled;
+    if (disabled) {
+      _entranceController.stop();
+      _entranceController.value = 1;
+      _shimmerController.stop();
+    } else {
+      _entranceController.forward();
+      _shimmerController.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _entranceFor(int index, Curve curve) {
+    final start = (index * .085).clamp(0.0, .82);
+    final end = (start + .3).clamp(.01, 1.0);
+    return CurvedAnimation(
+      parent: _entranceController,
+      curve: Interval(start, end, curve: curve),
+    );
+  }
+
+  Widget _enter(int index, Widget child) {
+    final interval = _entranceFor(index, Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: interval,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, .12),
+          end: Offset.zero,
+        ).animate(interval),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reducedMotion = _motionDisabled ?? false;
+    final reasons = _WhyAtithi.reasons;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+      children: [
+        _enter(0, const _AboutHero()),
+        const SizedBox(height: 22),
+        _enter(
+          1,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedBuilder(
+                animation: _shimmerController,
+                builder: (context, child) {
+                  final progress = reducedMotion
+                      ? 0.5
+                      : _shimmerController.value;
+                  final shift = -1.6 + progress * 3.2;
+                  return ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => LinearGradient(
+                      begin: Alignment(shift, 0),
+                      end: Alignment(shift + 1.1, 0),
+                      colors: const [
+                        _experienceNavy,
+                        _experienceGold,
+                        _experienceNavy,
+                      ],
+                      stops: const [0.35, 0.5, 0.65],
+                    ).createShader(bounds),
+                    child: child,
+                  );
+                },
+                child: Text(
+                  'Atithi',
+                  style: GoogleFonts.playfairDisplay(
+                    color: _experienceNavy,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 66),
+                duration: reducedMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 850),
+                curve: Curves.easeOutCubic,
+                builder: (context, width, _) => Container(
+                  width: width,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: _experienceGold,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _enter(
+          2,
+          Text(
+            widget.property.description.isEmpty
+                ? 'Property introduction is not available yet.'
+                : widget.property.description,
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF4A4F5C),
+              height: 1.65,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        _enter(3, _AboutStatsRow(statsFuture: _statsFuture)),
+        const SizedBox(height: 24),
+        _enter(
+          4,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _AboutSectionHeading('Our Services'),
+              const SizedBox(height: 10),
+              ServicesOrbit(
+                loadItems: widget.repository.getServiceItems,
+                reducedMotion: reducedMotion,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        _enter(5, const _AboutSectionHeading('Why Choose Atithi?')),
+        const SizedBox(height: 12),
+        for (var index = 0; index < reasons.length; index++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _enter(
+              6 + index,
+              _WhyAtithiTile(
+                reason: reasons[index],
+                iconAnimation: _entranceFor(6 + index, Curves.elasticOut),
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
+        _enter(
+          10,
+          SizedBox(
+            height: 56,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_experienceNavy, Color(0xFF244C6C)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: _experienceNavy.withValues(alpha: .2),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => GoRouter.of(context).go('/rooms'),
+                  child: Center(
+                    child: Text(
+                      'Book Your Stay',
+                      style: GoogleFonts.dmSans(
+                        color: _experienceCream,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AboutHero extends StatefulWidget {
+  const _AboutHero();
+
+  @override
+  State<_AboutHero> createState() => _AboutHeroState();
+}
+
+class _AboutHeroState extends State<_AboutHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool? _motionDisabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.of(context).disableAnimations;
+    if (_motionDisabled == disabled) return;
+    _motionDisabled = disabled;
+    if (disabled) {
+      _controller.stop();
+      _controller.value = .5;
+    } else {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final progress = _controller.value;
+      final floatY = _motionDisabled == true
+          ? 0.0
+          : math.sin(progress * math.pi * 2) * 8;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: SizedBox(
+          height: 240,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.lerp(
+                      Alignment.topLeft,
+                      Alignment.bottomLeft,
+                      progress,
+                    )!,
+                    end: Alignment.lerp(
+                      Alignment.bottomRight,
+                      Alignment.topRight,
+                      progress,
+                    )!,
+                    colors: const [
+                      Color(0xFF0B2036),
+                      _experienceNavy,
+                      Color(0xFF244B68),
+                    ],
+                  ),
+                ),
+              ),
+              CustomPaint(
+                painter: _HeroAtmospherePainter(progress),
+                child: const SizedBox.expand(),
+              ),
+              Center(
+                child: Transform.translate(
+                  offset: Offset(0, floatY),
+                  child: Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      color: _experienceCream.withValues(alpha: .08),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _experienceLightGold.withValues(alpha: .65),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _experienceGold.withValues(alpha: .16),
+                          blurRadius: 30,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.apartment_rounded,
+                      color: _experienceLightGold,
+                      size: 42,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 20,
+                bottom: 18,
+                child: Text(
+                  'A refined stay, warmly remembered',
+                  style: GoogleFonts.dmSans(
+                    color: _experienceCream.withValues(alpha: .88),
+                    fontSize: 12,
+                    letterSpacing: .4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _HeroAtmospherePainter extends CustomPainter {
+  const _HeroAtmospherePainter(this.progress);
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * .52);
+    for (var ring = 0; ring < 3; ring++) {
+      final phase = (progress + ring / 3) % 1;
+      final radius = 30 + phase * 142;
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = _experienceLightGold.withValues(alpha: (1 - phase) * .34);
+      canvas.drawCircle(center, radius, paint);
+    }
+    const dots = <(double, double, double)>[
+      (.14, .24, .2),
+      (.82, .22, 1.4),
+      (.23, .72, 2.1),
+      (.76, .7, 3.4),
+      (.42, .14, 4.3),
+      (.91, .48, 5.5),
+      (.08, .52, .9),
+    ];
+    for (final (x, y, phase) in dots) {
+      final twinkle =
+          .35 + .65 * ((math.sin(progress * math.pi * 2 + phase) + 1) / 2);
+      canvas.drawCircle(
+        Offset(size.width * x, size.height * y),
+        1.2 + twinkle * 1.2,
+        Paint()..color = _experienceLightGold.withValues(alpha: twinkle * .8),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroAtmospherePainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+class _AboutStatsRow extends StatelessWidget {
+  const _AboutStatsRow({required this.statsFuture});
+  final Future<AboutStats> statsFuture;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<AboutStats>(
+    future: statsFuture,
+    builder: (context, snapshot) {
+      final stats = snapshot.data;
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth = (constraints.maxWidth - 16) / 3;
+          return Row(
+            children: [
+              SizedBox(
+                width: cardWidth,
+                child: _StatCard(
+                  label: 'Rooms',
+                  value: stats?.rooms.toDouble() ?? 0,
+                  suffix: '+',
+                  displayUnavailable: snapshot.hasError || stats == null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: cardWidth,
+                child: const _StatCard(
+                  label: 'Support',
+                  value: 24,
+                  suffix: '/7',
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: cardWidth,
+                child: _StatCard(
+                  label: 'Rating',
+                  value: stats?.averageRating ?? 0,
+                  suffix: '★',
+                  decimals: 1,
+                  displayUnavailable:
+                      snapshot.hasError || stats?.averageRating == null,
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.suffix,
+    this.decimals = 0,
+    this.displayUnavailable = false,
+  });
+
+  final String label;
+  final double value;
+  final String suffix;
+  final int decimals;
+  final bool displayUnavailable;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+    decoration: BoxDecoration(
+      color: _experienceCard,
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: _experienceLightGold.withValues(alpha: .55)),
+    ),
+    child: Column(
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: value),
+          duration: const Duration(milliseconds: 1100),
+          curve: Curves.easeOutCubic,
+          builder: (context, count, _) => Text(
+            displayUnavailable
+                ? '—'
+                : '${count.toStringAsFixed(decimals)}$suffix',
+            maxLines: 1,
+            style: GoogleFonts.playfairDisplay(
+              color: _experienceNavy,
+              fontSize: 23,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.dmSans(
+            color: const Color(0xFF4A4F5C),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AboutSectionHeading extends StatelessWidget {
+  const _AboutSectionHeading(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    title,
+    style: GoogleFonts.playfairDisplay(
+      color: _experienceNavy,
+      fontSize: 23,
+      fontWeight: FontWeight.w700,
+    ),
+  );
+}
+
+class ServicesOrbit extends StatefulWidget {
+  const ServicesOrbit({
+    required this.loadItems,
+    required this.reducedMotion,
+    super.key,
+  });
+
+  final Future<List<ServiceItem>> Function() loadItems;
+  final bool reducedMotion;
+
+  @override
+  State<ServicesOrbit> createState() => _ServicesOrbitState();
+}
+
+class _ServicesOrbitState extends State<ServicesOrbit>
+    with SingleTickerProviderStateMixin {
+  late Future<List<ServiceItem>> _itemsFuture;
+  late final AnimationController _rotationController;
+  Timer? _activeTimer;
+  int _activeIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemsFuture = widget.loadItems();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 36),
+    );
+    if (!widget.reducedMotion) _rotationController.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant ServicesOrbit oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.loadItems != widget.loadItems) {
+      _itemsFuture = widget.loadItems();
+      _activeIndex = 0;
+    }
+    if (oldWidget.reducedMotion != widget.reducedMotion) {
+      if (widget.reducedMotion) {
+        _rotationController.stop();
+        _rotationController.value = 0;
+        _activeTimer?.cancel();
+      } else {
+        _rotationController.repeat();
+        _startActiveTimer();
+      }
+    }
+  }
+
+  void _startActiveTimer([int itemCount = 0]) {
+    _activeTimer?.cancel();
+    if (widget.reducedMotion || itemCount < 2) return;
+    _activeTimer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
+      if (!mounted) return;
+      setState(() => _activeIndex = (_activeIndex + 1) % itemCount);
+    });
+  }
+
+  void _retry() {
+    setState(() {
+      _activeIndex = 0;
+      _itemsFuture = widget.loadItems();
+    });
+  }
+
+  @override
+  void dispose() {
+    _activeTimer?.cancel();
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<ServiceItem>>(
+    future: _itemsFuture,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return _InlineDataState(
+          text: 'Services could not be loaded. Please try again.',
+          diagnostic: _debugDataError(snapshot.error),
+          onRetry: _retry,
+        );
+      }
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const SizedBox(height: 320, child: _InlineLoading());
+      }
+      final items = snapshot.data ?? const <ServiceItem>[];
+      if (items.isEmpty) {
+        return const _InlineDataState(
+          text: 'Services will appear here when available.',
+        );
+      }
+      if (!widget.reducedMotion && _activeTimer == null && items.length > 1) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _activeTimer == null) {
+            _startActiveTimer(items.length);
+          }
+        });
+      }
+      final active = _activeIndex % items.length;
+      return SizedBox(
+        height: 330,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = math.min(constraints.maxWidth, 360.0);
+            final center = Offset(width / 2, 165);
+            final radius = math.min(width / 2 - 24, 130.0);
+            return Center(
+              child: SizedBox(
+                width: width,
+                height: 330,
+                child: AnimatedBuilder(
+                  animation: _rotationController,
+                  builder: (context, _) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _OrbitRingPainter(_experienceGold),
+                        ),
+                      ),
+                      for (var index = 0; index < items.length; index++)
+                        _orbitNode(
+                          item: items[index],
+                          index: index,
+                          count: items.length,
+                          active: index == active,
+                          angleProgress: widget.reducedMotion
+                              ? 0.0
+                              : _rotationController.value * math.pi * 2,
+                          center: center,
+                          radius: radius,
+                        ),
+                      Center(
+                        child: Container(
+                          width: 176,
+                          height: 176,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _experienceCard,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _experienceLightGold.withValues(alpha: .9),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _experienceNavy.withValues(alpha: .12),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: widget.reducedMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 350),
+                            child: Column(
+                              key: ValueKey(items[active].name),
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  items[active].icon,
+                                  color: _experienceGold,
+                                  size: 31,
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  items[active].name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.dmSans(
+                                    color: _experienceNavy,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  items[active].description.isEmpty
+                                      ? 'Thoughtful service for a comfortable stay.'
+                                      : items[active].description,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.dmSans(
+                                    color: const Color(0xFF4A4F5C),
+                                    fontSize: 10,
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    },
+  );
+
+  Widget _orbitNode({
+    required ServiceItem item,
+    required int index,
+    required int count,
+    required bool active,
+    required double angleProgress,
+    required Offset center,
+    required double radius,
+  }) {
+    final angle = -math.pi / 2 + angleProgress + index * math.pi * 2 / count;
+    final offset = Offset(
+      center.dx + math.cos(angle) * radius - 24,
+      center.dy + math.sin(angle) * radius - 24,
+    );
+    return Positioned(
+      left: offset.dx,
+      top: offset.dy,
+      child: Semantics(
+        button: true,
+        selected: active,
+        label: item.name,
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _activeIndex = index);
+            _startActiveTimer(count);
+          },
+          child: AnimatedScale(
+            scale: active ? 1.18 : 1,
+            duration: widget.reducedMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 300),
+            curve: Curves.easeOutBack,
+            child: AnimatedContainer(
+              duration: widget.reducedMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 300),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: active ? _experienceGold : _experienceCard,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: active ? _experienceLightGold : _experienceGold,
+                  width: active ? 2 : 1,
+                ),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: _experienceGold.withValues(alpha: .4),
+                          blurRadius: 18,
+                          spreadRadius: 3,
+                        ),
+                      ]
+                    : const [],
+              ),
+              child: Icon(
+                item.icon,
+                color: active ? Colors.white : _experienceNavy,
+                size: 22,
+              ),
+            ),
           ),
         ),
       ),
-      const SizedBox(height: 12),
-      _AnimatedSection(
-        delay: const Duration(milliseconds: 80),
-        child: Text(
-          property.description.isNotEmpty
-              ? property.description
-              : 'Property introduction is not available yet.',
-          style: const TextStyle(
-            color: Color(0xFF4A4F5C),
-            height: 1.6,
-            fontSize: 15,
+    );
+  }
+}
+
+class _OrbitRingPainter extends CustomPainter {
+  const _OrbitRingPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width / 2 - 24, 130.0);
+    final paint = Paint()
+      ..color = color.withValues(alpha: .7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    const dashCount = 64;
+    final circumference = math.pi * 2 * radius;
+    final dashLength = circumference / dashCount * .48;
+    for (var index = 0; index < dashCount; index++) {
+      final start = index * math.pi * 2 / dashCount;
+      final end = start + dashLength / radius;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        start,
+        end - start,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrbitRingPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+class _WhyAtithiTile extends StatelessWidget {
+  const _WhyAtithiTile({required this.reason, required this.iconAnimation});
+  final (String, IconData) reason;
+  final Animation<double> iconAnimation;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+    decoration: BoxDecoration(
+      color: _experienceCard,
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: _experienceLightGold.withValues(alpha: .65)),
+    ),
+    child: Row(
+      children: [
+        ScaleTransition(
+          scale: iconAnimation,
+          child: CircleAvatar(
+            radius: 20,
+            backgroundColor: _experienceLightGold.withValues(alpha: .34),
+            child: Icon(reason.$2, color: _experienceGold, size: 21),
           ),
         ),
-      ),
-      const SizedBox(height: 24),
-      _AnimatedSection(
-        delay: const Duration(milliseconds: 220),
-        child: const _WhyAtithi(),
-      ),
-    ],
+        const SizedBox(width: 13),
+        Expanded(
+          child: Text(
+            reason.$1,
+            style: GoogleFonts.dmSans(
+              color: _experienceNavy,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -436,9 +1336,9 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                 children: [
                   if (property != null) ...[
-                    Text(
-                      property.name,
-                      style: const TextStyle(
+                    const Text(
+                      'Atithi',
+                      style: TextStyle(
                         color: _experienceNavy,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
@@ -1044,16 +1944,23 @@ class PropertyRoomsPreview extends StatelessWidget {
         if (rooms.isEmpty) {
           return const _InlineDataState(text: 'No rooms are available yet.');
         }
-        return SizedBox(
-          height: 420,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: rooms.length.clamp(0, 5),
-            separatorBuilder: (_, _) => const SizedBox(width: 14),
-            itemBuilder: (context, index) => SizedBox(
-              width: 270,
-              child: _RoomCard(room: PropertyRoom.fromRoom(rooms[index])),
-            ),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final room in rooms.take(5))
+                SizedBox(
+                  width: 280,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: RepaintBoundary(
+                      child: _RoomCard(room: PropertyRoom.fromRoom(room)),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
@@ -1077,26 +1984,104 @@ class PropertyServicesPreview extends StatelessWidget {
             text: 'No active services are available yet.',
           );
         }
-        return Wrap(
-          spacing: 9,
-          runSpacing: 9,
-          children: [
-            for (final service in services.take(6))
-              Chip(
-                avatar: Icon(
-                  _serviceIcon(service.iconName),
-                  color: _experienceNavy,
-                  size: 18,
-                ),
-                label: Text(service.name),
-                backgroundColor: _experienceCard,
-                side: const BorderSide(color: _experienceLightGold),
-              ),
-          ],
-        );
+        return _HomeServicesMarquee(services: services);
       },
     );
   }
+}
+
+class _HomeServicesMarquee extends StatefulWidget {
+  const _HomeServicesMarquee({required this.services});
+  final List<PropertyService> services;
+
+  @override
+  State<_HomeServicesMarquee> createState() => _HomeServicesMarqueeState();
+}
+
+class _HomeServicesMarqueeState extends State<_HomeServicesMarquee>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 28),
+  );
+  bool _paused = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_paused && !_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final first = widget.services
+        .take((widget.services.length + 1) ~/ 2)
+        .toList();
+    final second = widget.services.skip(first.length).toList();
+    return RepaintBoundary(
+      child: GestureDetector(
+        onPanDown: (_) {
+          _paused = true;
+          _controller.stop();
+        },
+        onPanEnd: (_) {
+          _paused = false;
+          if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
+        },
+        child: Column(
+          children: [
+            _marqueeRow(first, reverse: false),
+            const SizedBox(height: 7),
+            _marqueeRow(second.isEmpty ? first : second, reverse: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _marqueeRow(List<PropertyService> values, {required bool reverse}) =>
+      ClipRect(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final distance = _controller.value * 180;
+            final offset = reverse ? -distance : distance;
+            return Transform.translate(
+              offset: Offset(offset, 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var pass = 0; pass < 2; pass++)
+                    for (final service in values)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 9),
+                        child: Chip(
+                          avatar: Icon(
+                            _serviceIcon(service.iconName),
+                            color: _experienceNavy,
+                            size: 18,
+                          ),
+                          label: Text(service.name),
+                          backgroundColor: _experienceCard,
+                          side: const BorderSide(color: _experienceLightGold),
+                        ),
+                      ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
 }
 
 class PropertyAboutPreview extends StatelessWidget {
@@ -1125,48 +2110,127 @@ class PropertyAboutPreview extends StatelessWidget {
               color: _experienceLightGold.withValues(alpha: .65),
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
-              const Icon(
-                Icons.hotel_class_outlined,
-                color: _experienceGold,
-                size: 27,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (property.name.isNotEmpty)
-                      Text(
-                        property.name,
-                        style: const TextStyle(
-                          color: _experienceNavy,
-                          fontWeight: FontWeight.w700,
+              Row(
+                children: [
+                  const Icon(
+                    Icons.hotel_class_outlined,
+                    color: _experienceGold,
+                    size: 27,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (property.name.isNotEmpty)
+                          const Text(
+                            'Atithi',
+                            style: TextStyle(
+                              color: _experienceNavy,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        if (property.name.isNotEmpty && text.isNotEmpty)
+                          const SizedBox(height: 4),
+                        Text(
+                          text.isNotEmpty
+                              ? text
+                              : 'About details are not available yet.',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _experienceNavy,
+                            height: 1.45,
+                          ),
                         ),
-                      ),
-                    if (property.name.isNotEmpty && text.isNotEmpty)
-                      const SizedBox(height: 4),
-                    Text(
-                      text.isNotEmpty
-                          ? text
-                          : 'About details are not available yet.',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _experienceNavy,
-                        height: 1.45,
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 18),
+              const _AboutRings(),
             ],
           ),
         );
       },
     );
   }
+}
+
+class _AboutRings extends StatelessWidget {
+  const _AboutRings();
+  @override
+  Widget build(BuildContext context) => FutureBuilder<AboutStats>(
+    future: const PropertyContentRepository().getAboutStats(),
+    builder: (context, snapshot) {
+      final stats = snapshot.data;
+      final rating = stats?.averageRating;
+      final values = <(String, String, double)>[
+        ('Rooms', stats == null ? '50+' : '${stats.rooms}+', .8),
+        ('Support', '24/7', 1),
+        (
+          'Rating',
+          rating == null ? '5★' : rating.toStringAsFixed(1),
+          rating == null ? .96 : (rating / 5).clamp(0, 1),
+        ),
+      ];
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          for (final (label, value, progress) in values)
+            Column(
+              children: [
+                SizedBox(
+                  width: 68,
+                  height: 68,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: progress),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 1100),
+                    builder: (context, current, _) => Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: current,
+                          strokeWidth: 5,
+                          backgroundColor: _experienceLightGold.withValues(
+                            alpha: .28,
+                          ),
+                          valueColor: const AlwaysStoppedAnimation(
+                            _experienceGold,
+                          ),
+                        ),
+                        Text(
+                          value,
+                          style: const TextStyle(
+                            color: _experienceNavy,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: _experienceNavy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      );
+    },
+  );
 }
 
 class PropertyHighlightsPreview extends StatelessWidget {
@@ -1234,7 +2298,7 @@ class _RoomCard extends StatelessWidget {
     elevation: 2,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(20),
-      side: const BorderSide(color: Color(0x55E6C786)),
+      side: BorderSide(color: AppColors.gold.withValues(alpha: .35)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1247,94 +2311,187 @@ class _RoomCard extends StatelessWidget {
           ),
           child: _RoomImageCarousel(imageUrls: room.imageUrls, height: 175),
         ),
-        Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                room.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _experienceNavy,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${room.type.isEmpty ? 'Room' : room.type} · ${room.capacity} guests',
-                style: const TextStyle(color: Color(0xFF4A4F5C), fontSize: 13),
-              ),
-              if (room.description.isNotEmpty) ...[
-                const SizedBox(height: 5),
-                Text(
-                  room.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF4A4F5C),
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 7),
-              Text(
-                '₹${room.pricePerNight} / night',
-                style: const TextStyle(
-                  color: _experienceNavy,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'Availability: ${room.availability.isEmpty ? 'Not specified' : room.availability}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF4A4F5C), fontSize: 12),
-              ),
-              if (room.amenities.isNotEmpty) ...[
-                const SizedBox(height: 5),
-                Text(
-                  room.amenities.join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF4A4F5C),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PropertyRoomDetailsScreen(room: room),
-                      ),
-                    ),
-                    child: const Text('View Details'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () => _showBookingUnavailable(context),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _experienceNavy,
-                      foregroundColor: _experienceCream,
-                    ),
-                    child: const Text('Book Now'),
-                  ),
-                ],
-              ),
-            ],
+        _roomDetails(context),
+      ],
+    ),
+  );
+
+  Widget _roomDetails(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(14),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          room.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: _experienceNavy,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
           ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${room.type.isEmpty ? 'Room' : room.type} · ${room.capacity} guests',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFF4A4F5C), fontSize: 13),
+        ),
+        if (room.description.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text(
+            room.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF4A4F5C),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
+        const SizedBox(height: 7),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                '₹${NumberFormat.decimalPattern('en_IN').format(room.pricePerNight)} / night',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _experienceNavy,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _PropertyAvailabilityBadge(
+              available: room.availability.toLowerCase() == 'available',
+            ),
+          ],
+        ),
+        if (room.amenities.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: room.amenities
+                .take(5)
+                .map((amenity) => _PropertyAmenityChip(amenity: amenity))
+                .toList(),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PropertyRoomDetailsScreen(room: room),
+                  ),
+                ),
+                child: const Text('View Details'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: () => _showBookingUnavailable(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _experienceNavy,
+                  foregroundColor: _experienceCream,
+                ),
+                child: const Text('Book Now'),
+              ),
+            ),
+          ],
         ),
       ],
     ),
   );
+}
+
+class _PropertyAvailabilityBadge extends StatelessWidget {
+  const _PropertyAvailabilityBadge({required this.available});
+  final bool available;
+  @override
+  Widget build(BuildContext context) {
+    final color = available ? const Color(0xFF25804B) : const Color(0xFFB53838);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        available ? 'Available' : 'Sold out',
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _PropertyAmenityChip extends StatelessWidget {
+  const _PropertyAmenityChip({required this.amenity});
+  final String amenity;
+  @override
+  Widget build(BuildContext context) {
+    final key = amenity.trim().toLowerCase().replaceAll(' ', '_');
+    const labels = {
+      'wifi': 'WiFi',
+      'tv': 'TV',
+      'ac': 'AC',
+      'mini_bar': 'Mini Bar',
+      'balcony': 'Balcony',
+    };
+    const icons = {
+      'wifi': Icons.wifi_rounded,
+      'tv': Icons.tv_rounded,
+      'ac': Icons.ac_unit_rounded,
+      'mini_bar': Icons.local_bar_rounded,
+      'balcony': Icons.balcony_rounded,
+    };
+    final label =
+        labels[key] ??
+        key
+            .split('_')
+            .map(
+              (part) => part.isEmpty
+                  ? part
+                  : '${part[0].toUpperCase()}${part.substring(1)}',
+            )
+            .join(' ');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: _experienceLightGold.withValues(alpha: .25),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icons[key] ?? Icons.check_rounded,
+            size: 13,
+            color: _experienceGold,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: _experienceNavy),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RoomImageCarousel extends StatefulWidget {
@@ -1736,7 +2893,7 @@ class _InfoSection extends StatelessWidget {
 class _WhyAtithi extends StatelessWidget {
   const _WhyAtithi();
 
-  static const _reasons = [
+  static const reasons = [
     ('Premium Rooms & Suites', Icons.king_bed_outlined),
     ('Safe & Secure Stay', Icons.shield_outlined),
     ('24/7 Support', Icons.support_agent_outlined),
@@ -1744,32 +2901,175 @@ class _WhyAtithi extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      for (final (reason, icon) in _reasons)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: _experienceLightGold.withValues(alpha: .35),
-                child: Icon(icon, color: _experienceGold),
+  Widget build(BuildContext context) => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: reasons.length,
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      mainAxisExtent: 170,
+    ),
+    itemBuilder: (context, index) => _WhyFlipTile(
+      index: index,
+      title: reasons[index].$1,
+      icon: reasons[index].$2,
+      detail: const [
+        'Spacious rooms with modern comfort.',
+        'Your safety comes first, always.',
+        'Our team is always one call away.',
+        'Book direct for honest prices.',
+      ][index],
+    ),
+  );
+}
+
+class _WhyFlipTile extends StatefulWidget {
+  const _WhyFlipTile({
+    required this.index,
+    required this.title,
+    required this.icon,
+    required this.detail,
+  });
+  final int index;
+  final String title;
+  final IconData icon;
+  final String detail;
+
+  @override
+  State<_WhyFlipTile> createState() => _WhyFlipTileState();
+}
+
+class _WhyFlipTileState extends State<_WhyFlipTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flip = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  );
+  bool _reducedMotion = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+    if (_reducedMotion) return;
+    Future<void>.delayed(Duration(milliseconds: widget.index * 220), () async {
+      if (!mounted || _reducedMotion) return;
+      await _flip.forward();
+      if (mounted) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+      if (mounted) await _flip.reverse();
+    });
+  }
+
+  @override
+  void dispose() {
+    _flip.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () {
+      if (!_reducedMotion) {
+        _flip.isCompleted ? _flip.reverse() : _flip.forward();
+      }
+    },
+    child: AnimatedBuilder(
+      animation: _flip,
+      builder: (context, _) {
+        final back = _flip.value >= .5;
+        return Transform(
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, .001)
+            ..rotateY(math.pi * _flip.value),
+          alignment: Alignment.center,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: back ? _experienceNavy : _experienceCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: _experienceLightGold.withValues(alpha: .75),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  reason,
-                  style: const TextStyle(
-                    color: _experienceNavy,
-                    fontWeight: FontWeight.w700,
+            ),
+            child: back
+                ? Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.rotationY(math.pi),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(widget.icon, color: _experienceLightGold),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.detail,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: _experienceCream,
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Stack(
+                    children: [
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Text(
+                          '0${widget.index + 1}',
+                          style: TextStyle(
+                            color: _experienceGold.withValues(alpha: .22),
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: _experienceLightGold.withValues(
+                                  alpha: .3,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                widget.icon,
+                                color: _experienceGold,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.title,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _experienceNavy,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
           ),
-        ),
-    ],
+        );
+      },
+    ),
   );
 }
 

@@ -89,8 +89,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                                 color: selected
                                     ? Palette.gold
                                     : between
-                                    ? Palette.gold.withOpacity(.33)
-                                    : Palette.cream.withOpacity(.1),
+                                    ? Palette.gold.withValues(alpha: .33)
+                                    : Palette.cream.withValues(alpha: .1),
                                 borderRadius: BorderRadius.horizontal(
                                   left: Radius.circular(i == _start ? 22 : 7),
                                   right: Radius.circular(i == _end ? 22 : 7),
@@ -106,7 +106,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                                       fontSize: 8,
                                       color: selected
                                           ? Palette.navy
-                                          : Palette.cream.withOpacity(.65),
+                                          : Palette.cream.withValues(alpha: .65),
                                     ),
                                   ),
                                   Text(
@@ -132,7 +132,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: Palette.gold.withOpacity(.33),
+                          color: Palette.gold.withValues(alpha: .33),
                         ),
                         borderRadius: BorderRadius.circular(26),
                       ),
@@ -212,7 +212,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(.07),
+                                    color: Colors.black.withValues(alpha: .07),
                                     blurRadius: 10,
                                     offset: const Offset(0, 3),
                                   ),
@@ -464,7 +464,7 @@ class _DialPainter extends CustomPainter {
       math.pi,
       false,
       Paint()
-        ..color = Colors.white.withOpacity(.2)
+        ..color = Colors.white.withValues(alpha: .2)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
@@ -496,7 +496,7 @@ class _DialPainter extends CustomPainter {
           center.dy + radius * math.sin(angle),
         ),
         1.4,
-        Paint()..color = Colors.white.withOpacity(.28),
+        Paint()..color = Colors.white.withValues(alpha: .28),
       );
     }
   }

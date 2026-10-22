@@ -10,6 +10,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../models/room.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
+import '../../features/home/widgets/reveal_on_scroll.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
 import 'widgets/rooms_header.dart';
@@ -30,6 +31,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   List<String> _categories = [];
   Set<String> _favorites = {};
   final Set<String> _amenities = {};
+  final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0);
   bool _loading = true;
   Object? _error;
   String? _debugError;
@@ -41,11 +44,27 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_updateParallaxOffset);
     if (kDebugMode && !_didDebugRowCheck) {
       _didDebugRowCheck = true;
       unawaited(_debugRoomRowCount());
     }
     _load();
+  }
+
+  void _updateParallaxOffset() {
+    if (_scrollOffset.value != _scrollController.offset) {
+      _scrollOffset.value = _scrollController.offset;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_updateParallaxOffset)
+      ..dispose();
+    _scrollOffset.dispose();
+    super.dispose();
   }
 
   Future<void> _debugRoomRowCount() async {
@@ -171,9 +190,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final textScale = media.textScaler.scale(1).clamp(1.0, 1.15).toDouble();
     return MediaQuery(
-      data: media.copyWith(textScaler: TextScaler.linear(textScale)),
+      data: media,
       child: Scaffold(
         backgroundColor: AppColors.cream,
         body: SafeArea(
@@ -192,6 +210,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
 
                 return CustomScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                   slivers: [
                     SliverToBoxAdapter(
                       child: RoomsHeader(
@@ -259,21 +281,24 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         ),
                       )
                     else
-                      _buildRoomsGrid(maxWidth, contentWidth, columns),
+                      _buildRoomsGrid(maxWidth, contentWidth),
                     SliverToBoxAdapter(
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: contentWidth),
-                          child: const Padding(
-                            padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
-                            child: WhyChooseAtithiCard(),
+                          child: RevealOnScroll(
+                            slideFrom: const Offset(-.15, 0),
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
+                              child: WhyChooseAtithiCard(),
+                            ),
                           ),
                         ),
                       ),
                     ),
                     SliverToBoxAdapter(
                       child: SizedBox(
-                        height: MediaQuery.paddingOf(context).bottom + 63,
+                        height: MediaQuery.paddingOf(context).bottom + 100,
                       ),
                     ),
                   ],
@@ -364,46 +389,49 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     ),
   );
 
-  Widget _buildRoomsGrid(double maxWidth, double contentWidth, int columns) {
-    return SliverToBoxAdapter(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: contentWidth),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: maxWidth > 700 ? 24 : 14),
-            child: LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _rooms.map((room) {
-                  return SizedBox(
-                    width:
-                        (constraints.maxWidth - (columns - 1) * 12) / columns,
-                    child: RoomCard(
-                      room: room,
-                      isFavorite: _favorites.contains(room.id),
-                      onFavorite: () => _favorite(room),
-                      onDetails: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              RoomDetailsScreen(roomId: room.id, room: room),
-                        ),
-                      ),
-                      onBook: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => RoomBookingPlaceholder(room: room),
-                        ),
+  // SliverList builds room cards lazily so each reveal runs as it enters view.
+  Widget _buildRoomsGrid(double maxWidth, double contentWidth) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final room = _rooms[index];
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: contentWidth),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                maxWidth > 700 ? 24 : 14,
+                index == 0 ? 0 : 12,
+                maxWidth > 700 ? 24 : 14,
+                0,
+              ),
+              child: RevealOnScroll(
+                delay: Duration(milliseconds: index * 120),
+                child: _PressScale(
+                  child: RoomCard(
+                    room: room,
+                    scrollOffset: _scrollOffset,
+                    isFavorite: _favorites.contains(room.id),
+                    onFavorite: () => _favorite(room),
+                    onDetails: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            RoomDetailsScreen(roomId: room.id, room: room),
                       ),
                     ),
-                  );
-                }).toList(),
+                    onBook: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => RoomBookingPlaceholder(room: room),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      }, childCount: _rooms.length),
     );
   }
 
@@ -623,6 +651,31 @@ class _SortLabel extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _PressScale extends StatefulWidget {
+  const _PressScale({required this.child});
+  final Widget child;
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (_) => setState(() => _pressed = true),
+    onPointerUp: (_) => setState(() => _pressed = false),
+    onPointerCancel: (_) => setState(() => _pressed = false),
+    child: AnimatedScale(
+      scale: _pressed && !MediaQuery.disableAnimationsOf(context) ? .97 : 1,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      child: widget.child,
+    ),
   );
 }
 

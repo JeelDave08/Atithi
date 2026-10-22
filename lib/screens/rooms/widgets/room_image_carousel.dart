@@ -80,32 +80,34 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
               ),
             ),
           ),
-          Positioned(
-            right: 9,
-            bottom: 9,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.navy.withValues(alpha: .9),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.gold,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${page + 1}/${urls.isEmpty ? 0 : urls.length}',
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ],
+          if (urls.length > 1)
+            Positioned(
+              bottom: 10,
+              left: 0,
+              right: 0,
+              child: Semantics(
+                label: 'Image ${page + 1} of ${urls.length}',
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var index = 0; index < urls.length; index++)
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOut,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: index == page ? 20 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: index == page
+                              ? AppColors.gold
+                              : Colors.white70,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

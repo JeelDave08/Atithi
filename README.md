@@ -22,16 +22,16 @@ The app loads published properties and rooms, active services, contact details,
 and bookings from Supabase. Contact form submissions are stored in
 `contact_messages`.
 
-Supabase URL and anon key are configured in `lib/core/supabase_config.dart`.
-No `.env` file or Dart compile-time define is required.
+The Supabase URL and anon/publishable key have project defaults in
+`lib/core/supabase_config.dart`, so the app can be run without extra defines.
+Optional `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` Dart defines can override
+those defaults. Use only the anon/publishable key; never use a secret or
+service-role key in the app.
 
 ```powershell
-flutter run -d windows
+flutter run -d <device>
 ```
 
 Run the command from the directory containing `pubspec.yaml` (`D:\Atithi`).
-The app uses the signed-in Firebase user's ID token for Supabase requests.
-Configure Firebase as a Supabase third-party authentication provider, and
-ensure RLS permits published-content reads and restricts bookings to the
-authenticated guest. Keep RLS enabled and never use a service-role key in the
-Flutter app.
+RLS must permit published-content reads and restrict bookings to the
+authenticated guest. Keep RLS enabled.

@@ -6,7 +6,7 @@ class AmenityChip extends StatelessWidget {
   const AmenityChip({required this.amenity, super.key});
   final String amenity;
   static const labels = {
-    'wifi': 'Wi-Fi',
+    'wifi': 'WiFi',
     'tv': 'TV',
     'ac': 'AC',
     'room_service': 'Room Service',
@@ -24,29 +24,41 @@ class AmenityChip extends StatelessWidget {
     'work_desk': Icons.desk,
   };
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      CircleAvatar(
-        radius: 15,
-        backgroundColor: AppColors.gold.withValues(alpha: .2),
-        child: Icon(
-          icons[amenity] ?? Icons.check,
-          size: 15,
-          color: AppColors.darkGold,
-        ),
+  Widget build(BuildContext context) {
+    final key = amenity.trim().toLowerCase().replaceAll(' ', '_');
+    final label =
+        labels[key] ??
+        key
+            .split('_')
+            .map(
+              (part) => part.isEmpty
+                  ? part
+                  : '${part[0].toUpperCase()}${part.substring(1)}',
+            )
+            .join(' ');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: .17),
+        borderRadius: BorderRadius.circular(16),
       ),
-      const SizedBox(height: 4),
-      SizedBox(
-        width: 56,
-        child: Text(
-          labels[amenity] ?? amenity,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 9, color: AppColors.greyText),
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icons[key] ?? Icons.check_rounded,
+            size: 14,
+            color: AppColors.darkGold,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: AppColors.greyText),
+          ),
+        ],
       ),
-    ],
-  );
+    );
+  }
 }

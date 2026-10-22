@@ -33,19 +33,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await widget.authRepository.sendPasswordReset(
         _emailController.text.trim(),
       );
-      if (mounted)
+      if (mounted) {
         showAuthMessage(
           context,
           'If an account exists for this email, password reset instructions have been sent.',
         );
+      }
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         showAuthMessage(
           context,
           'Unable to send the reset link. Please try again.',
         );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
