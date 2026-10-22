@@ -30,12 +30,6 @@ Future<void> main() async {
 
   runApp(const ProviderScope(child: AtithiApp()));
 }
-**Validation:** Authentication UI tests passed. `flutter analyze` reports 26 info-level lints, including the SDK deprecation notice for the requested `anonKey` parameter; it reports no compile errors.
-
-From `D:\Atithi`, run `flutter clean`, then `flutter pub get`, then fully stop and restart the app (not hot reload).
-**Validation:** Authentication UI tests passed. `flutter analyze` reports 26 info-level lints, including the SDK deprecation notice for the requested `anonKey` parameter; it reports no compile errors.
-
-From `D:\Atithi`, run `flutter clean`, then `flutter pub get`, then fully stop and restart the app (not hot reload).
 
 class AtithiApp extends ConsumerWidget {
   const AtithiApp({super.key});
