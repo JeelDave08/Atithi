@@ -15,6 +15,7 @@ import '../../screens/auth_screen.dart';
 import '../../screens/forgot_password_screen.dart';
 import '../../screens/register_screen.dart';
 import '../../screens/splash_screen.dart';
+import '../../screens/rooms/rooms_screen.dart';
 
 final authRepositoryProvider = Provider<AuthService>(
   (ref) => const AuthService(),
@@ -78,14 +79,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/contact',
         builder: (context, state) => const PropertyContactScreen(),
       ),
-      GoRoute(
-        path: '/rooms',
-        builder: (context, state) => PropertyRoomsScreen(
-          selection: state.extra is RoomSearchSelection
-              ? state.extra! as RoomSearchSelection
-              : null,
-        ),
-      ),
+      GoRoute(path: '/rooms', builder: (context, state) => const RoomsScreen()),
       GoRoute(
         path: '/availability',
         builder: (context, state) => AvailabilityScreen(
