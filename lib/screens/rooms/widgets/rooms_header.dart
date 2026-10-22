@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/image_utils.dart';
 import '../../../theme/app_colors.dart';
 
 class RoomsHeader extends StatelessWidget {
@@ -16,9 +17,24 @@ class RoomsHeader extends StatelessWidget {
         Positioned.fill(
           child: imageUrl != null && imageUrl!.isNotEmpty
               ? CachedNetworkImage(
-                  imageUrl: imageUrl!,
+                  imageUrl: optimizedImageUrl(imageUrl!),
+                  memCacheWidth: 800,
+                  maxWidthDiskCache: 800,
                   fit: BoxFit.cover,
-                  errorWidget: (_, _, _) => const _HeaderFallback(),
+                  fadeInDuration: const Duration(milliseconds: 200),
+                  filterQuality: FilterQuality.low,
+                  placeholder: (_, _) =>
+                      const ColoredBox(color: AppColors.cream),
+                  errorWidget: (_, _, _) => const ColoredBox(
+                    color: AppColors.cream,
+                    child: Center(
+                      child: Icon(
+                        Icons.bed_outlined,
+                        color: AppColors.greyText,
+                        size: 36,
+                      ),
+                    ),
+                  ),
                 )
               : const _HeaderFallback(),
         ),

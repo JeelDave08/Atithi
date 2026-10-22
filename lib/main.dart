@@ -10,6 +10,9 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = 100 * 1024 * 1024
+    ..maximumSize = 200;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 

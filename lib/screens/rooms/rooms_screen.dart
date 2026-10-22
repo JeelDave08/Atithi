@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../models/room.dart';
+import '../../core/image_utils.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
 import 'widgets/room_card.dart';
@@ -24,13 +26,17 @@ class RoomsScreen extends ConsumerStatefulWidget {
 
 class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   static bool _didDebugRowCheck = false;
+  static const _pageSize = 20;
 
   final _service = RoomService();
+  final ScrollController _scrollController = ScrollController();
   List<Room> _rooms = [];
   List<String> _categories = [];
   Set<String> _favorites = {};
   final Set<String> _amenities = {};
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   Object? _error;
   String? _debugError;
   String _category = 'All';
@@ -41,11 +47,32 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     if (kDebugMode && !_didDebugRowCheck) {
       _didDebugRowCheck = true;
       unawaited(_debugRoomRowCount());
     }
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients ||
+        _loading ||
+        _loadingMore ||
+        !_hasMore) {
+      return;
+    }
+    if (_scrollController.position.extentAfter < 600) {
+      unawaited(_loadMore());
+    }
   }
 
   Future<void> _debugRoomRowCount() async {
@@ -60,7 +87,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadingMore = false;
+      _hasMore = true;
+    });
     try {
       final results = await Future.wait([
         _service.fetchCategories(),
@@ -70,6 +101,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           capacityRange: _capacity,
           amenities: _amenities,
           sort: _sort,
+          from: 0,
+          to: _pageSize - 1,
         ),
       ]);
       final user = FirebaseAuth.instance.currentUser;
@@ -80,6 +113,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       setState(() {
         _categories = results[0] as List<String>;
         _rooms = results[1] as List<Room>;
+        _hasMore = _rooms.length == _pageSize;
         _favorites = favorites;
         _error = null;
         _debugError = null;
@@ -95,6 +129,32 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         }
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _rooms.isEmpty) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextRooms = await _service.fetchRooms(
+        roomType: _category,
+        priceRange: _price,
+        capacityRange: _capacity,
+        amenities: _amenities,
+        sort: _sort,
+        from: _rooms.length,
+        to: _rooms.length + _pageSize - 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _rooms = [..._rooms, ...nextRooms];
+        _hasMore = nextRooms.length == _pageSize;
+        _loadingMore = false;
+      });
+    } catch (error, stack) {
+      debugPrint('Rooms pagination error: $error\n$stack');
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
     }
   }
 
@@ -192,6 +252,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
 
                 return CustomScrollView(
+                  controller: _scrollController,
                   slivers: [
                     SliverToBoxAdapter(
                       child: RoomsHeader(
@@ -260,6 +321,17 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       )
                     else
                       _buildRoomsGrid(maxWidth, contentWidth, columns),
+                    if (_loadingMore)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.darkGold,
+                            ),
+                          ),
+                        ),
+                      ),
                     SliverToBoxAdapter(
                       child: Center(
                         child: ConstrainedBox(
@@ -364,48 +436,63 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     ),
   );
 
-  Widget _buildRoomsGrid(double maxWidth, double contentWidth, int columns) {
-    return SliverToBoxAdapter(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: contentWidth),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: maxWidth > 700 ? 24 : 14),
-            child: LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _rooms.map((room) {
-                  return SizedBox(
-                    width:
-                        (constraints.maxWidth - (columns - 1) * 12) / columns,
-                    child: RoomCard(
-                      room: room,
-                      isFavorite: _favorites.contains(room.id),
-                      onFavorite: () => _favorite(room),
-                      onDetails: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              RoomDetailsScreen(roomId: room.id, room: room),
+  Widget _buildRoomsGrid(double maxWidth, double contentWidth, int columns) =>
+      SliverList(
+        delegate: SliverChildBuilderDelegate((context, rowIndex) {
+          final firstRoomIndex = rowIndex * columns;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: maxWidth > 700 ? 24 : 14,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const SizedBox(width: 12),
+                        Expanded(
+                          child: firstRoomIndex + column >= _rooms.length
+                              ? const SizedBox.shrink()
+                              : _buildRoomCard(
+                                  context,
+                                  _rooms[firstRoomIndex + column],
+                                ),
                         ),
-                      ),
-                      onBook: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => RoomBookingPlaceholder(room: room),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
+          );
+        }, childCount: (_rooms.length / columns).ceil()),
+      );
+
+  Widget _buildRoomCard(BuildContext context, Room room) => RepaintBoundary(
+    key: ValueKey(room.id),
+    child: RoomCard(
+      key: ValueKey(room.id),
+      room: room,
+      isFavorite: _favorites.contains(room.id),
+      onFavorite: () => _favorite(room),
+      onDetails: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => RoomDetailsScreen(roomId: room.id, room: room),
         ),
       ),
-    );
-  }
+      onBook: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => RoomBookingPlaceholder(room: room),
+        ),
+      ),
+    ),
+  );
 
   Widget _state(
     IconData icon,
@@ -647,17 +734,49 @@ class RoomDetailsScreen extends StatelessWidget {
     body: ListView(
       padding: const EdgeInsets.all(18),
       children: [
-        if (room.imageUrls.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              room.imageUrls.first,
-              height: 230,
-              fit: BoxFit.cover,
-              errorBuilder: (_, error, stackTrace) =>
-                  const SizedBox(height: 230, child: Icon(Icons.bed_outlined)),
-            ),
-          ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: room.imageUrls.isEmpty
+              ? const SizedBox(
+                  height: 230,
+                  child: ColoredBox(
+                    color: AppColors.cream,
+                    child: Center(
+                      child: Icon(
+                        Icons.bed_outlined,
+                        color: AppColors.greyText,
+                      ),
+                    ),
+                  ),
+                )
+              : CachedNetworkImage(
+                  imageUrl: optimizedImageUrl(
+                    room.imageUrls.first,
+                    width: 1600,
+                  ),
+                  width: double.infinity,
+                  height: 230,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 800,
+                  maxWidthDiskCache: 800,
+                  fadeInDuration: const Duration(milliseconds: 200),
+                  filterQuality: FilterQuality.low,
+                  placeholder: (_, _) =>
+                      const ColoredBox(color: AppColors.cream),
+                  errorWidget: (_, _, _) => const SizedBox(
+                    height: 230,
+                    child: ColoredBox(
+                      color: AppColors.cream,
+                      child: Center(
+                        child: Icon(
+                          Icons.bed_outlined,
+                          color: AppColors.greyText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
         Text(
           room.roomName ?? 'Room',
           style: const TextStyle(

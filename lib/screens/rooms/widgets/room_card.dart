@@ -48,6 +48,7 @@ class RoomCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             RoomImageCarousel(
+              key: ValueKey(room.id),
               room: room,
               isFavorite: isFavorite,
               onFavorite: onFavorite,

@@ -15,6 +15,8 @@ class RoomService {
     String? capacityRange,
     Set<String> amenities = const {},
     String sort = 'Recommended',
+    int from = 0,
+    int to = 19,
   }) async {
     var query = _client.from('rooms').select().eq('is_published', true);
 
@@ -42,7 +44,9 @@ class RoomService {
     }
 
     // Keep the recommended database order for this screen.
-    final rows = await query.order('sort_order', ascending: true);
+    final rows = await query
+        .order('sort_order', ascending: true)
+        .range(from, to);
     final rooms = <Room>[];
     for (final row in rows) {
       try {
