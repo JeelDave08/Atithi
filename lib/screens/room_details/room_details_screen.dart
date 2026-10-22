@@ -3,13 +3,13 @@ import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/room.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
+import '../booking/booking_screen.dart';
 import 'room_details_constants.dart';
 import 'widgets/about_room_card.dart';
 import 'widgets/availability_card.dart';
@@ -285,13 +285,12 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
     }
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => RoomBookingPlaceholder(
+        builder: (_) => BookingScreen(
           room: room,
           checkIn: _checkIn,
           checkOut: _checkOut,
           adults: _adults,
           children: _children,
-          total: _totalAmount,
         ),
       ),
     );
@@ -525,85 +524,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
           child: child,
         ),
       ),
-    ),
-  );
-}
-
-class RoomBookingPlaceholder extends StatelessWidget {
-  const RoomBookingPlaceholder({
-    required this.room,
-    required this.checkIn,
-    required this.checkOut,
-    required this.adults,
-    required this.children,
-    required this.total,
-    super.key,
-  });
-
-  final Room room;
-  final DateTime checkIn;
-  final DateTime checkOut;
-  final int adults;
-  final int children;
-  final double total;
-
-  static final _currency = NumberFormat.currency(
-    locale: 'en_IN',
-    symbol: '₹',
-    decimalDigits: 0,
-  );
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      backgroundColor: AppColors.navy,
-      foregroundColor: AppColors.cream,
-      title: const Text('Booking Summary'),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          room.roomName ?? 'Room',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.playfairDisplay(
-            color: AppColors.navy,
-            fontSize: 25,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          '${DateFormat('EEE, d MMM yyyy').format(checkIn)} – '
-          '${DateFormat('EEE, d MMM yyyy').format(checkOut)}',
-          style: const TextStyle(color: AppColors.navy, fontSize: 14),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '$adults Adults · $children Children',
-          style: const TextStyle(color: AppColors.greyText, fontSize: 13),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'Total amount · ${_currency.format(total)}',
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'The booking flow is not connected yet. Your room and stay details are ready for the next step.',
-          style: TextStyle(
-            color: AppColors.greyText,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
-      ],
     ),
   );
 }

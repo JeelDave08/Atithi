@@ -11,7 +11,7 @@ import '../../models/room.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
 import '../room_details/room_details_screen.dart';
-import '../room_details/room_details_constants.dart';
+import '../booking/booking_screen.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
 import 'widgets/rooms_header.dart';
@@ -492,9 +492,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         requestedCheckOut != null && requestedCheckOut.isAfter(checkIn)
         ? requestedCheckOut
         : checkIn.add(const Duration(days: 1));
-    final nights = checkOut.difference(checkIn).inDays;
-    final total = (room.pricePerNight ?? 0) * nights * (1 + kTaxRate);
-
     return RepaintBoundary(
       key: ValueKey(room.id),
       child: RoomCard(
@@ -518,13 +515,12 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         onBook: () => Navigator.push(
           context,
           MaterialPageRoute<void>(
-            builder: (_) => RoomBookingPlaceholder(
+            builder: (_) => BookingScreen(
               room: room,
               checkIn: checkIn,
               checkOut: checkOut,
               adults: widget.adults,
               children: widget.children,
-              total: total,
             ),
           ),
         ),

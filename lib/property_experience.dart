@@ -4,10 +4,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'core/image_utils.dart';
 import 'models/room.dart';
+import 'theme/app_colors.dart';
 
 const _experienceCream = Color(0xFFFBF7EF);
 const _experienceCard = Color(0xFFFFFCF6);
@@ -232,11 +237,16 @@ class PropertyContentRepository {
   }
 
   Future<List<Map<String, dynamic>>> getMyBookings() async {
-    if (FirebaseAuth.instance.currentUser == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       throw StateError('Sign in to view your bookings.');
     }
     try {
-      final rows = await _supabase.from('bookings').select();
+      final rows = await _supabase
+          .from('bookings')
+          .select('*, rooms(room_name, image_urls)')
+          .eq('firebase_uid', user.uid)
+          .order('created_at', ascending: false);
       return rows.map((row) => Map<String, dynamic>.from(row)).toList();
     } catch (error, stackTrace) {
       _logPropertyDataFailure('Load current user bookings', error, stackTrace);
@@ -944,11 +954,47 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                 setState(() => _bookings = widget.repository.getMyBookings()),
           );
         }
-        if (!snapshot.hasData) return const _PageLoading();
+        if (!snapshot.hasData) return const _BookingsLoading();
         final bookings = snapshot.data!;
         if (bookings.isEmpty) {
-          return const _PageState(
-            message: 'Your Atithi reservations will appear here when you have a booking.',
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.luggage_outlined,
+                    color: AppColors.darkGold,
+                    size: 42,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No bookings yet',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Find your next comfortable stay with Atithi.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.greyText),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    onPressed: () => context.go('/rooms'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: AppColors.cream,
+                    ),
+                    child: const Text('Find your stay'),
+                  ),
+                ],
+              ),
+            ),
           );
         }
         return RefreshIndicator(
@@ -963,11 +1009,26 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final booking = bookings[index];
-              final room = _bookingValue(booking, 'room_id');
+              final roomData = booking['rooms'];
+              final roomRow = roomData is Map
+                  ? Map<String, dynamic>.from(roomData)
+                  : const <String, dynamic>{};
+              final room =
+                  _bookingValue(roomRow, 'room_name') ??
+                  _bookingValue(booking, 'room_id');
+              final images = roomRow['image_urls'];
+              final imageUrl = images is List && images.isNotEmpty
+                  ? images.first?.toString()
+                  : null;
               final status = _bookingValue(booking, 'booking_status');
               final checkIn = _bookingValue(booking, 'check_in');
               final checkOut = _bookingValue(booking, 'check_out');
               final total = _bookingValue(booking, 'total_amount');
+              final statusColor = status?.toLowerCase() == 'confirmed'
+                  ? AppColors.darkGold
+                  : status?.toLowerCase() == 'cancelled'
+                  ? AppColors.greyText
+                  : AppColors.navy;
               return Container(
                 padding: const EdgeInsets.all(17),
                 decoration: BoxDecoration(
@@ -977,41 +1038,111 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                     color: _experienceLightGold.withValues(alpha: .65),
                   ),
                 ),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      room ?? 'Reservation',
-                      style: const TextStyle(
-                        color: _experienceNavy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (status != null) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        status,
-                        style: const TextStyle(color: _experienceGold),
-                      ),
-                    ],
-                    if (checkIn != null || checkOut != null) ...[
-                      const SizedBox(height: 9),
-                      Text(
-                        'Stay: ${checkIn ?? '—'} – ${checkOut ?? '—'}',
-                        style: const TextStyle(color: Color(0xFF4A4F5C)),
-                      ),
-                    ],
-                    if (total != null) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        'Total: $total',
-                        style: const TextStyle(
-                          color: _experienceNavy,
-                          fontWeight: FontWeight.w600,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: SizedBox(
+                        width: 78,
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: imageUrl == null
+                              ? const ColoredBox(
+                                  color: AppColors.gold,
+                                  child: Icon(
+                                    Icons.bed_outlined,
+                                    color: AppColors.navy,
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: optimizedImageUrl(imageUrl),
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 300,
+                                  maxWidthDiskCache: 300,
+                                  placeholder: (_, _) =>
+                                      const ColoredBox(color: AppColors.cream),
+                                  errorWidget: (_, _, _) => const ColoredBox(
+                                    color: AppColors.cream,
+                                    child: Icon(
+                                      Icons.bed_outlined,
+                                      color: AppColors.darkGold,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  room ?? 'Reservation',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.navy,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (status != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.cream,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (checkIn != null || checkOut != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Stay: ${checkIn ?? '—'} – ${checkOut ?? '—'}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.greyText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          if (total != null) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              'Total: ${NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(num.tryParse(total) ?? 0)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.navy,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -1019,6 +1150,58 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
           ),
         );
       },
+    ),
+  );
+}
+
+class _BookingsLoading extends StatelessWidget {
+  const _BookingsLoading();
+
+  @override
+  Widget build(BuildContext context) => ListView.separated(
+    padding: const EdgeInsets.all(20),
+    itemCount: 4,
+    separatorBuilder: (_, _) => const SizedBox(height: 12),
+    itemBuilder: (context, index) => Shimmer.fromColors(
+      baseColor: AppColors.gold.withValues(alpha: .16),
+      highlightColor: AppColors.cream,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cream,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: AppColors.cream,
+                borderRadius: BorderRadius.circular(13),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 16,
+                    child: ColoredBox(color: AppColors.cream),
+                  ),
+                  SizedBox(height: 10),
+                  SizedBox(
+                    width: 130,
+                    height: 12,
+                    child: ColoredBox(color: AppColors.cream),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }
