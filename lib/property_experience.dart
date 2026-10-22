@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'models/room.dart';
+
 const _experienceCream = Color(0xFFFBF7EF);
 const _experienceCard = Color(0xFFFFFCF6);
 const _experienceNavy = Color(0xFF102B46);
@@ -18,45 +20,26 @@ class PropertyContent {
     required this.id,
     required this.name,
     required this.description,
-    required this.aboutContent,
-    required this.philosophy,
     required this.contactPhone,
     required this.contactEmail,
     required this.address,
-    required this.imageUrls,
-    required this.highlights,
-    required this.mapUrl,
   });
 
   final String id;
   final String name;
   final String description;
-  final String aboutContent;
-  final String philosophy;
   final String contactPhone;
   final String contactEmail;
   final String address;
-  final List<String> imageUrls;
-  final List<String> highlights;
-  final String mapUrl;
 
   factory PropertyContent.fromRow(Map<String, dynamic> data) {
     return PropertyContent(
       id: _stringValue(data['id']),
       name: _stringValue(data['name']),
       description: _stringValue(data['description']),
-      aboutContent: _stringValue(data['about_content']),
-      philosophy: _stringValue(data['philosophy']),
-      contactPhone: _stringValue(data['phone']).isNotEmpty
-          ? _stringValue(data['phone'])
-          : _stringValue(data['contact_phone']),
-      contactEmail: _stringValue(data['email']).isNotEmpty
-          ? _stringValue(data['email'])
-          : _stringValue(data['contact_email']),
+      contactPhone: _stringValue(data['phone']),
+      contactEmail: _stringValue(data['email']),
       address: _stringValue(data['address']),
-      imageUrls: _stringList(data['image_urls']),
-      highlights: _stringList(data['highlights']),
-      mapUrl: _stringValue(data['map_url']),
     );
   }
 }
@@ -107,6 +90,18 @@ class PropertyRoom {
   final List<String> imageUrls;
   final String availability;
 
+  factory PropertyRoom.fromRoom(Room room) => PropertyRoom(
+    id: room.id,
+    name: room.roomName ?? 'Room',
+    type: room.roomType ?? '',
+    description: room.description ?? '',
+    pricePerNight: room.pricePerNight ?? 0,
+    capacity: room.capacity ?? 0,
+    amenities: room.amenities,
+    imageUrls: room.imageUrls,
+    availability: room.status ?? '',
+  );
+
   factory PropertyRoom.fromRow(Map<String, dynamic> data) {
     final capacity = data['capacity'];
     final price = data['price_per_night'];
@@ -115,8 +110,8 @@ class PropertyRoom {
       name: _stringValue(data['room_name']),
       type: _stringValue(data['room_type']),
       description: _stringValue(data['description']),
-      pricePerNight: price is num ? price : 0,
-      capacity: capacity is num ? capacity.toInt() : 0,
+      pricePerNight: num.tryParse(price.toString()) ?? 0,
+      capacity: num.tryParse(capacity.toString())?.toInt() ?? 0,
       amenities: _stringList(data['amenities']),
       imageUrls: _stringList(data['image_urls']),
       availability: _stringValue(data['status']),
@@ -134,10 +129,7 @@ class PropertyContentRepository {
     try {
       final result = await _supabase
           .from('properties')
-          .select(
-            'id, name, description, about_content, philosophy, phone, email, '
-            'address, image_urls, highlights, map_url, is_published, created_at',
-          )
+          .select('id,name,description,address,phone,email')
           .eq('is_published', true)
           .order('created_at')
           .limit(1)
@@ -162,29 +154,19 @@ class PropertyContentRepository {
     }
   }
 
-  Future<List<PropertyService>> getServices([String? propertyId]) async {
+  Future<List<PropertyService>> getServices() async {
     try {
-      var query = _supabase
+      final rows = await _supabase
           .from('services')
-          .select(
-            'id, property_id, name, description, image_url, is_active, '
-            'created_at',
-          )
-          .eq('is_active', true);
-      query = propertyId == null
-          ? query.isFilter('property_id', null)
-          : query.or('property_id.is.null,property_id.eq.$propertyId');
-      final rows = await query.order('created_at');
+          .select('id,name,description,image_url')
+          .eq('is_active', true)
+          .order('created_at');
       return rows
           .map(PropertyService.fromRow)
           .where((service) => service.name.isNotEmpty)
           .toList();
     } catch (error, stackTrace) {
-      _logPropertyDataFailure(
-        'Load active services${propertyId == null ? '' : ' for property $propertyId'}',
-        error,
-        stackTrace,
-      );
+      _logPropertyDataFailure('Load active services', error, stackTrace);
       rethrow;
     }
   }
@@ -215,21 +197,33 @@ class PropertyContentRepository {
     }
   }
 
+  Future<List<Room>> getHomeRooms() async {
+    try {
+      final rows = await _supabase
+          .from('rooms')
+          .select()
+          .eq('is_published', true)
+          .order('sort_order')
+          .limit(5);
+      return rows.map((row) => Room.fromJson(row)).toList();
+    } catch (error, stackTrace) {
+      _logPropertyDataFailure('Load Home rooms', error, stackTrace);
+      rethrow;
+    }
+  }
+
   Future<void> createContactMessage({
-    required String propertyId,
     required String name,
     required String email,
-    required String subject,
+    String? phone,
     required String message,
   }) async {
     try {
       await _supabase.from('contact_messages').insert({
-        'property_id': propertyId,
         'name': name.trim(),
         'email': email.trim(),
-        'subject': subject.trim(),
+        'phone': (phone?.trim().isEmpty ?? true) ? null : phone!.trim(),
         'message': message.trim(),
-        'status': 'new',
       });
     } catch (error, stackTrace) {
       _logPropertyDataFailure('Save contact message', error, stackTrace);
@@ -331,10 +325,7 @@ class _AboutContent extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
     children: [
-      _PropertyImage(
-        url: property.imageUrls.isEmpty ? null : property.imageUrls.first,
-        height: 230,
-      ),
+      _PropertyImage(url: null, height: 230),
       const SizedBox(height: 24),
       _AnimatedSection(
         delay: Duration.zero,
@@ -353,9 +344,7 @@ class _AboutContent extends StatelessWidget {
       _AnimatedSection(
         delay: const Duration(milliseconds: 80),
         child: Text(
-          property.aboutContent.isNotEmpty
-              ? property.aboutContent
-              : property.description.isNotEmpty
+          property.description.isNotEmpty
               ? property.description
               : 'Property introduction is not available yet.',
           style: const TextStyle(
@@ -367,47 +356,9 @@ class _AboutContent extends StatelessWidget {
       ),
       const SizedBox(height: 24),
       _AnimatedSection(
-        delay: const Duration(milliseconds: 150),
-        child: _InfoSection(
-          title: 'Our Philosophy',
-          body: property.philosophy.isEmpty
-              ? 'Our philosophy is not available yet.'
-              : property.philosophy,
-        ),
-      ),
-      const SizedBox(height: 24),
-      _AnimatedSection(
         delay: const Duration(milliseconds: 220),
-        child: _WhyAtithi(highlights: property.highlights),
+        child: const _WhyAtithi(),
       ),
-      if (property.imageUrls.length > 1) ...[
-        const SizedBox(height: 26),
-        _AnimatedSection(
-          delay: const Duration(milliseconds: 300),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionTitle('A Glimpse of the Property'),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 150,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: property.imageUrls.length - 1,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) => SizedBox(
-                    width: 220,
-                    child: _PropertyImage(
-                      url: property.imageUrls[index + 1],
-                      height: 150,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     ],
   );
 }
@@ -457,7 +408,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
         if (!_servicesLoaded || _servicesPropertyId != property?.id) {
           _servicesPropertyId = property?.id;
           _servicesLoaded = true;
-          _services = widget.repository.getServices(property?.id);
+          _services = widget.repository.getServices();
         }
         return FutureBuilder<List<PropertyService>>(
           future: _services,
@@ -519,7 +470,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
   }
 
   Future<void> _refreshServices(String? propertyId) async {
-    final future = widget.repository.getServices(propertyId);
+    final future = widget.repository.getServices();
     setState(() {
       _servicesPropertyId = propertyId;
       _services = future;
@@ -565,16 +516,14 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
     super.dispose();
   }
 
-  Future<void> _submit(PropertyContent property) async {
+  Future<void> _submit() async {
     if (_submitting || !_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     try {
       await widget.repository.createContactMessage(
-        propertyId: property.id,
         name: _name.text,
         email: _email.text,
-        subject: _subject.text,
-        message: _message.text,
+        message: '${_subject.text.trim()}\n${_message.text.trim()}'.trim(),
       );
       if (!mounted) return;
       _name.clear();
@@ -585,7 +534,9 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
         const SnackBar(content: Text('Your message was sent successfully.')),
       );
     } catch (error, stackTrace) {
-      debugPrint('Contact message submission failed: $error\n$stackTrace');
+      if (kDebugMode) {
+        debugPrint('Contact message submission failed: $error\n$stackTrace');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -628,10 +579,7 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            _PropertyImage(
-              url: property.imageUrls.isEmpty ? null : property.imageUrls.first,
-              height: 180,
-            ),
+            _PropertyImage(url: null, height: 180),
             const SizedBox(height: 20),
             if (property.contactPhone.isEmpty &&
                 property.contactEmail.isEmpty &&
@@ -666,13 +614,6 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
                 icon: Icons.location_on_outlined,
                 title: 'Address',
                 value: property.address,
-              ),
-            if (_isWebUrl(property.mapUrl))
-              TextButton.icon(
-                onPressed: () =>
-                    _launchContact(context, Uri.parse(property.mapUrl)),
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('View location'),
               ),
             const SizedBox(height: 18),
             const _SectionTitle('Send Us a Message'),
@@ -723,7 +664,7 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _submitting ? null : () => _submit(property),
+                      onPressed: _submitting ? null : _submit,
                       style: FilledButton.styleFrom(
                         backgroundColor: _experienceNavy,
                         foregroundColor: _experienceCream,
@@ -1022,34 +963,11 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final booking = bookings[index];
-              final room = _bookingValue(booking, const [
-                'room_name',
-                'room_type',
-                'property_name',
-              ]);
-              final status = _bookingValue(booking, const [
-                'status',
-                'booking_status',
-              ]);
-              final checkIn = _bookingValue(booking, const [
-                'check_in',
-                'check_in_date',
-                'arrival_date',
-              ]);
-              final checkOut = _bookingValue(booking, const [
-                'check_out',
-                'check_out_date',
-                'departure_date',
-              ]);
-              final reference = _bookingValue(booking, const [
-                'booking_reference',
-                'reference',
-              ]);
-              final total = _bookingValue(booking, const [
-                'total_amount',
-                'total_price',
-                'amount',
-              ]);
+              final room = _bookingValue(booking, 'room_id');
+              final status = _bookingValue(booking, 'booking_status');
+              final checkIn = _bookingValue(booking, 'check_in');
+              final checkOut = _bookingValue(booking, 'check_out');
+              final total = _bookingValue(booking, 'total_amount');
               return Container(
                 padding: const EdgeInsets.all(17),
                 decoration: BoxDecoration(
@@ -1084,13 +1002,6 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                         style: const TextStyle(color: Color(0xFF4A4F5C)),
                       ),
                     ],
-                    if (reference != null) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        'Reference: $reference',
-                        style: const TextStyle(color: Color(0xFF4A4F5C)),
-                      ),
-                    ],
                     if (total != null) ...[
                       const SizedBox(height: 5),
                       Text(
@@ -1112,12 +1023,10 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
   );
 }
 
-String? _bookingValue(Map<String, dynamic> booking, List<String> keys) {
-  for (final key in keys) {
-    final value = booking[key];
-    if (value != null && value.toString().trim().isNotEmpty) {
-      return value.toString().trim();
-    }
+String? _bookingValue(Map<String, dynamic> booking, String key) {
+  final value = booking[key];
+  if (value != null && value.toString().trim().isNotEmpty) {
+    return value.toString().trim();
   }
   return null;
 }
@@ -1128,53 +1037,24 @@ class PropertyRoomsPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const repository = PropertyContentRepository();
-    return FutureBuilder<PropertyContent?>(
-      future: repository.getActiveProperty(),
-      builder: (context, propertySnapshot) {
-        if (propertySnapshot.hasError) {
-          return _InlineDataState(
-            text: 'Room information could not be loaded.',
-            diagnostic: _debugDataError(propertySnapshot.error),
-          );
+    return _RetryableSection<List<Room>>(
+      load: repository.getHomeRooms,
+      errorMessage: 'Room information could not be loaded. Please try again.',
+      builder: (context, rooms) {
+        if (rooms.isEmpty) {
+          return const _InlineDataState(text: 'No rooms are available yet.');
         }
-        if (!propertySnapshot.hasData) {
-          return const _InlineLoading();
-        }
-        final property = propertySnapshot.data;
-        if (property == null) {
-          return const _InlineDataState(
-            text: 'Room details will appear here when published.',
-          );
-        }
-        return FutureBuilder<List<PropertyRoom>>(
-          future: repository.getRooms(property.id),
-          builder: (context, roomsSnapshot) {
-            if (roomsSnapshot.hasError) {
-              return _InlineDataState(
-                text: 'Room information could not be loaded.',
-                diagnostic: _debugDataError(roomsSnapshot.error),
-              );
-            }
-            if (!roomsSnapshot.hasData) {
-              return const _InlineLoading();
-            }
-            final rooms = roomsSnapshot.data!;
-            if (rooms.isEmpty) {
-              return const _InlineDataState(
-                text: 'No rooms have been published yet.',
-              );
-            }
-            return SizedBox(
-              height: 420,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: rooms.length.clamp(0, 5),
-                separatorBuilder: (_, _) => const SizedBox(width: 14),
-                itemBuilder: (context, index) =>
-                    SizedBox(width: 270, child: _RoomCard(room: rooms[index])),
-              ),
-            );
-          },
+        return SizedBox(
+          height: 420,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: rooms.length.clamp(0, 5),
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, index) => SizedBox(
+              width: 270,
+              child: _RoomCard(room: PropertyRoom.fromRoom(rooms[index])),
+            ),
+          ),
         );
       },
     );
@@ -1187,55 +1067,32 @@ class PropertyServicesPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const repository = PropertyContentRepository();
-    return FutureBuilder<PropertyContent?>(
-      future: repository.getActiveProperty(),
-      builder: (context, propertySnapshot) {
-        if (propertySnapshot.hasError) {
-          return _InlineDataState(
-            text: 'Service information could not be loaded.',
-            diagnostic: _debugDataError(propertySnapshot.error),
+    return _RetryableSection<List<PropertyService>>(
+      load: repository.getServices,
+      errorMessage:
+          'Service information could not be loaded. Please try again.',
+      builder: (context, services) {
+        if (services.isEmpty) {
+          return const _InlineDataState(
+            text: 'No active services are available yet.',
           );
         }
-        if (!propertySnapshot.hasData) {
-          return const _InlineLoading();
-        }
-        final property = propertySnapshot.data;
-        return FutureBuilder<List<PropertyService>>(
-          future: repository.getServices(property?.id),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _InlineDataState(
-                text: 'Service information could not be loaded.',
-                diagnostic: _debugDataError(snapshot.error),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const _InlineLoading();
-            }
-            final services = snapshot.data!;
-            if (services.isEmpty) {
-              return const _InlineDataState(
-                text: 'No services have been published yet.',
-              );
-            }
-            return Wrap(
-              spacing: 9,
-              runSpacing: 9,
-              children: [
-                for (final service in services.take(6))
-                  Chip(
-                    avatar: Icon(
-                      _serviceIcon(service.iconName),
-                      color: _experienceNavy,
-                      size: 18,
-                    ),
-                    label: Text(service.name),
-                    backgroundColor: _experienceCard,
-                    side: const BorderSide(color: _experienceLightGold),
-                  ),
-              ],
-            );
-          },
+        return Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            for (final service in services.take(6))
+              Chip(
+                avatar: Icon(
+                  _serviceIcon(service.iconName),
+                  color: _experienceNavy,
+                  size: 18,
+                ),
+                label: Text(service.name),
+                backgroundColor: _experienceCard,
+                side: const BorderSide(color: _experienceLightGold),
+              ),
+          ],
         );
       },
     );
@@ -1248,27 +1105,17 @@ class PropertyAboutPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const repository = PropertyContentRepository();
-    return FutureBuilder<PropertyContent?>(
-      future: repository.getActiveProperty(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _InlineDataState(
-            text: 'Property information could not be loaded.',
-            diagnostic: _debugDataError(snapshot.error),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const _InlineLoading();
-        }
-        final property = snapshot.data;
+    return _RetryableSection<PropertyContent?>(
+      load: repository.getActiveProperty,
+      errorMessage:
+          'Property information could not be loaded. Please try again.',
+      builder: (context, property) {
         if (property == null) {
           return const _InlineDataState(
-            text: 'Property information will appear here when published.',
+            text: 'Property information is not available yet.',
           );
         }
-        final text = property.aboutContent.isNotEmpty
-            ? property.aboutContent
-            : property.description;
+        final text = property.description;
         return Container(
           padding: const EdgeInsets.all(17),
           decoration: BoxDecoration(
@@ -1287,15 +1134,31 @@ class PropertyAboutPreview extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  text.isNotEmpty
-                      ? text
-                      : property.name.isNotEmpty
-                      ? property.name
-                      : 'About details are not available yet.',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _experienceNavy, height: 1.45),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (property.name.isNotEmpty)
+                      Text(
+                        property.name,
+                        style: const TextStyle(
+                          color: _experienceNavy,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    if (property.name.isNotEmpty && text.isNotEmpty)
+                      const SizedBox(height: 4),
+                    Text(
+                      text.isNotEmpty
+                          ? text
+                          : 'About details are not available yet.',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _experienceNavy,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1311,43 +1174,53 @@ class PropertyHighlightsPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const repository = PropertyContentRepository();
-    return FutureBuilder<PropertyContent?>(
-      future: repository.getActiveProperty(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _InlineDataState(
-            text: 'Property highlights could not be loaded.',
-            diagnostic: _debugDataError(snapshot.error),
-          );
-        }
-        if (!snapshot.hasData) return const _InlineLoading();
-        final property = snapshot.data;
-        if (property == null || property.highlights.isEmpty) {
-          return const _InlineDataState(
-            text: 'Property highlights will appear here when published.',
-          );
-        }
-        return Wrap(
-          spacing: 9,
-          runSpacing: 9,
-          children: [
-            for (final highlight in property.highlights)
-              Chip(
-                avatar: const Icon(
-                  Icons.hotel_class_outlined,
-                  color: _experienceNavy,
-                  size: 18,
-                ),
-                label: Text(highlight),
-                backgroundColor: _experienceCard,
-                side: const BorderSide(color: _experienceLightGold),
-              ),
-          ],
-        );
-      },
-    );
+    return const _WhyAtithi();
   }
+}
+
+class _RetryableSection<T> extends StatefulWidget {
+  const _RetryableSection({
+    required this.load,
+    required this.errorMessage,
+    required this.builder,
+  });
+
+  final Future<T> Function() load;
+  final String errorMessage;
+  final Widget Function(BuildContext, T) builder;
+
+  @override
+  State<_RetryableSection<T>> createState() => _RetryableSectionState<T>();
+}
+
+class _RetryableSectionState<T> extends State<_RetryableSection<T>> {
+  late Future<T> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.load();
+  }
+
+  void _retry() => setState(() => _future = widget.load());
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<T>(
+    future: _future,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return _InlineDataState(
+          text: widget.errorMessage,
+          diagnostic: _debugDataError(snapshot.error),
+          onRetry: _retry,
+        );
+      }
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const _InlineLoading();
+      }
+      return widget.builder(context, snapshot.data as T);
+    },
+  );
 }
 
 class _RoomCard extends StatelessWidget {
@@ -1715,9 +1588,10 @@ String? _debugDataError(Object? error) {
 }
 
 class _InlineDataState extends StatelessWidget {
-  const _InlineDataState({required this.text, this.diagnostic});
+  const _InlineDataState({required this.text, this.diagnostic, this.onRetry});
   final String text;
   final String? diagnostic;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1743,6 +1617,8 @@ class _InlineDataState extends StatelessWidget {
             ),
           ),
         ],
+        if (onRetry != null)
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
       ],
     ),
   );
@@ -1858,36 +1734,32 @@ class _InfoSection extends StatelessWidget {
 }
 
 class _WhyAtithi extends StatelessWidget {
-  const _WhyAtithi({required this.highlights});
-  final List<String> highlights;
+  const _WhyAtithi();
+
+  static const _reasons = [
+    ('Premium Rooms & Suites', Icons.king_bed_outlined),
+    ('Safe & Secure Stay', Icons.shield_outlined),
+    ('24/7 Support', Icons.support_agent_outlined),
+    ('Best Rates', Icons.local_offer_outlined),
+  ];
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const _SectionTitle('Why Choose Atithi?'),
-      const SizedBox(height: 12),
-      if (highlights.isEmpty)
-        const Text(
-          'Property highlights are not available yet.',
-          style: TextStyle(color: Color(0xFF4A4F5C), height: 1.45),
-        ),
-      for (final highlight in highlights)
+      for (final (reason, icon) in _reasons)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             children: [
               CircleAvatar(
                 backgroundColor: _experienceLightGold.withValues(alpha: .35),
-                child: const Icon(
-                  Icons.hotel_class_outlined,
-                  color: _experienceNavy,
-                ),
+                child: Icon(icon, color: _experienceGold),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  highlight,
+                  reason,
                   style: const TextStyle(
                     color: _experienceNavy,
                     fontWeight: FontWeight.w700,
@@ -2133,7 +2005,9 @@ Future<void> _launchContact(BuildContext context, Uri uri) async {
       );
     }
   } catch (error, stackTrace) {
-    debugPrint('Unable to open contact action: $error\n$stackTrace');
+    if (kDebugMode) {
+      debugPrint('Unable to open contact action: $error\n$stackTrace');
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open this contact action.')),

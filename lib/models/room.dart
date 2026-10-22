@@ -40,22 +40,24 @@ class Room {
   final int? unitsLeft;
 
   factory Room.fromJson(Map<String, dynamic> json) => Room(
-    id: json['id'] as String,
-    propertyId: json['property_id'] as String?,
-    roomName: json['room_name'] as String? ?? 'Room',
-    roomType: json['room_type'] as String?,
-    description: json['description'] as String?,
+    id: json['id']?.toString() ?? '',
+    propertyId: json['property_id']?.toString(),
+    roomName: json['room_name']?.toString() ?? 'Room',
+    roomType: json['room_type']?.toString(),
+    description: json['description']?.toString(),
     pricePerNight: _toDouble(json['price_per_night']),
     capacity: _toInt(json['capacity']),
-    amenities: List<String>.from(json['amenities'] as List? ?? const []),
-    imageUrls: List<String>.from(json['image_urls'] as List? ?? const []),
-    status: json['status'] as String?,
-    isPublished: json['is_published'] as bool? ?? true,
+    amenities: _stringList(json['amenities']),
+    imageUrls: _stringList(json['image_urls']),
+    status: json['status']?.toString(),
+    isPublished: json['is_published'] is bool
+        ? json['is_published'] as bool
+        : true,
     createdAt: json['created_at'] == null
         ? null
         : DateTime.tryParse(json['created_at'].toString()),
-    badge: json['badge'] as String?,
-    bedInfo: json['bed_info'] as String?,
+    badge: json['badge']?.toString(),
+    bedInfo: json['bed_info']?.toString(),
     sizeSqft: _toInt(json['size_sqft']),
     rating: _toDouble(json['rating']),
     sortOrder: _toInt(json['sort_order']),
@@ -71,4 +73,7 @@ class Room {
     if (value == null) return null;
     return num.tryParse(value.toString())?.toInt();
   }
+
+  static List<String> _stringList(Object? value) =>
+      value is Iterable ? value.whereType<String>().toList() : const [];
 }

@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -290,9 +289,6 @@ class _HeroBanner extends StatelessWidget {
     future: const PropertyContentRepository().getActiveProperty(),
     builder: (context, snapshot) {
       final property = snapshot.data;
-      final imageUrl = property?.imageUrls.isNotEmpty == true
-          ? property!.imageUrls.first
-          : null;
       return ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: SizedBox(
@@ -301,15 +297,7 @@ class _HeroBanner extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (imageUrl != null)
-                CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, _, _) => const _HotelImageFallback(),
-                  placeholder: (_, _) => const _HotelImageFallback(),
-                )
-              else
-                const _HotelImageFallback(),
+              const _HotelImageFallback(),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
