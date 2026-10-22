@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,18 +13,13 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
-    accessToken: () async =>
-        await FirebaseAuth.instance.currentUser?.getIdToken(),
-  );
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
 
   try {
     await Supabase.instance.client.from('rooms').select('id').limit(1);
     debugPrint('Supabase OK');
-  } catch (error) {
-    debugPrint('Supabase health check failed: $error');
+  } catch (error, stack) {
+    debugPrint('Supabase health check failed: $error\n$stack');
   }
 
   runApp(const ProviderScope(child: AtithiApp()));
