@@ -41,13 +41,16 @@ class RoomFilterBar extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: SizedBox(
-                height: 38,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _category('All', Icons.grid_view),
-                    ...categories.map((c) => _category(c, Icons.bed_outlined)),
+                    ...categories
+                        .where((c) => c != 'All')
+                        .map((c) => _category(c, Icons.bed_outlined)),
                   ],
                 ),
               ),
@@ -133,30 +136,74 @@ class RoomFilterBar extends StatelessWidget {
     String value,
   ) => Padding(
     padding: const EdgeInsets.only(right: 6),
-    child: ActionChip(
-      onPressed: () => _sheet(context, title),
-      avatar: Icon(icon, size: 14, color: AppColors.darkGold),
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10, color: AppColors.navy),
-          ),
-          const Icon(
-            Icons.keyboard_arrow_down,
-            size: 15,
-            color: AppColors.navy,
-          ),
-        ],
+    child: Material(
+      color: Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(color: AppColors.gold.withValues(alpha: .55)),
       ),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: AppColors.gold.withValues(alpha: .55)),
-      visualDensity: VisualDensity.compact,
+      child: InkWell(
+        onTap: () => _sheet(context, title),
+        customBorder: const StadiumBorder(),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: AppColors.darkGold),
+                const SizedBox(width: 5),
+                Text(
+                  _shortLabel(title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.greyText,
+                  ),
+                ),
+                if (value != 'Any') ...[
+                  const SizedBox(width: 4),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 95),
+                    child: Text(
+                      _displayValue(value),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 15,
+                  color: AppColors.navy,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
+
+  String _shortLabel(String title) => switch (title) {
+    'Price Range' => 'Price',
+    'Room Type' => 'Type',
+    'Capacity' => 'Guests',
+    _ => title,
+  };
+
+  String _displayValue(String value) => switch (value) {
+    'Under 4000' => 'Under ₹4000',
+    '4000-6000' => '₹4000–6000',
+    '6000+' => '₹6000+',
+    _ => value,
+  };
   void _sheet(BuildContext context, String title) => showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.cream,

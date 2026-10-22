@@ -213,10 +213,13 @@ class RoomCard extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          child: const Text(
-                            'View Details →',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'View Details →',
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
                           ),
                         ),
                       ),
@@ -237,10 +240,13 @@ class RoomCard extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          child: const Text(
-                            'Book Now →',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Book Now →',
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
                           ),
                         ),
                       ),

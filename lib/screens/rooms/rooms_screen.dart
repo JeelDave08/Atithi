@@ -169,113 +169,123 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    body: SafeArea(
-      bottom: false,
-      child: RefreshIndicator(
-        color: AppColors.darkGold,
-        onRefresh: _load,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final maxWidth = constraints.maxWidth;
-            final columns = maxWidth < 380
-                ? 1
-                : maxWidth < 700
-                ? 2
-                : maxWidth < 1050
-                ? 3
-                : 4;
-            final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final textScale = media.textScaler.scale(1).clamp(1.0, 1.15).toDouble();
+    return MediaQuery(
+      data: media.copyWith(textScaler: TextScaler.linear(textScale)),
+      child: Scaffold(
+        backgroundColor: AppColors.cream,
+        body: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            color: AppColors.darkGold,
+            onRefresh: _load,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxWidth = constraints.maxWidth;
+                final columns = maxWidth < 600
+                    ? 1
+                    : maxWidth < 900
+                    ? 2
+                    : 3;
+                final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
 
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: RoomsHeader(
-                    imageUrl:
-                        _rooms.isNotEmpty && _rooms.first.imageUrls.isNotEmpty
-                        ? _rooms.first.imageUrls.first
-                        : null,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Transform.translate(
-                    offset: const Offset(0, -22),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: maxWidth > 700 ? 24 : 14,
-                      ),
-                      child: RoomFilterBar(
-                        categories: _categories,
-                        category: _category,
-                        price: _price,
-                        type: _category == 'All' ? null : _category,
-                        capacity: _capacity,
-                        amenities: _amenities,
-                        onCategory: (category) {
-                          setState(() => _category = category);
-                          _load();
-                        },
-                        onFilter: _apply,
-                        onClear: _clear,
+                return CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: RoomsHeader(
+                        imageUrl:
+                            _rooms.isNotEmpty &&
+                                _rooms.first.imageUrls.isNotEmpty
+                            ? _rooms.first.imageUrls.first
+                            : null,
                       ),
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildResultsRow(maxWidth, contentWidth),
-                ),
-                if (_loading)
-                  SliverToBoxAdapter(
-                    child: _skeletonGrid(maxWidth, columns, contentWidth),
-                  )
-                else if (_error != null)
-                  SliverToBoxAdapter(
-                    child: _state(
-                      Icons.wifi_off,
-                      'Could not load rooms',
-                      'Please check your connection and try again.',
-                      ElevatedButton(
-                        onPressed: _load,
-                        child: const Text('Retry'),
-                      ),
-                      debugDetails: kDebugMode ? _debugError : null,
-                    ),
-                  )
-                else if (_rooms.isEmpty)
-                  SliverToBoxAdapter(
-                    child: _state(
-                      Icons.hotel_outlined,
-                      'No rooms found',
-                      'Try changing or clearing your filters.',
-                      OutlinedButton(
-                        onPressed: _clear,
-                        child: const Text('Clear filters'),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          maxWidth > 700 ? 24 : 14,
+                          12,
+                          maxWidth > 700 ? 24 : 14,
+                          12,
+                        ),
+                        child: RoomFilterBar(
+                          categories: _categories,
+                          category: _category,
+                          price: _price,
+                          type: _category == 'All' ? null : _category,
+                          capacity: _capacity,
+                          amenities: _amenities,
+                          onCategory: (category) {
+                            setState(() => _category = category);
+                            _load();
+                          },
+                          onFilter: _apply,
+                          onClear: _clear,
+                        ),
                       ),
                     ),
-                  )
-                else
-                  _buildRoomsGrid(maxWidth, contentWidth, columns),
-                SliverToBoxAdapter(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: contentWidth),
-                      child: const Padding(
-                        padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
-                        child: WhyChooseAtithiCard(),
+                    SliverToBoxAdapter(
+                      child: _buildResultsRow(maxWidth, contentWidth),
+                    ),
+                    if (_loading)
+                      SliverToBoxAdapter(
+                        child: _skeletonGrid(maxWidth, columns, contentWidth),
+                      )
+                    else if (_error != null)
+                      SliverToBoxAdapter(
+                        child: _state(
+                          Icons.wifi_off,
+                          'Could not load rooms',
+                          'Please check your connection and try again.',
+                          ElevatedButton(
+                            onPressed: _load,
+                            child: const Text('Retry'),
+                          ),
+                          debugDetails: kDebugMode ? _debugError : null,
+                        ),
+                      )
+                    else if (_rooms.isEmpty)
+                      SliverToBoxAdapter(
+                        child: _state(
+                          Icons.hotel_outlined,
+                          'No rooms found',
+                          'Try changing or clearing your filters.',
+                          OutlinedButton(
+                            onPressed: _clear,
+                            child: const Text('Clear filters'),
+                          ),
+                        ),
+                      )
+                    else
+                      _buildRoomsGrid(maxWidth, contentWidth, columns),
+                    SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: contentWidth),
+                          child: const Padding(
+                            padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
+                            child: WhyChooseAtithiCard(),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 12)),
-              ],
-            );
-          },
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: MediaQuery.paddingOf(context).bottom + 63,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
+        bottomNavigationBar: const _RoomsNavigation(),
       ),
-    ),
-    bottomNavigationBar: const _RoomsNavigation(),
-  );
+    );
+  }
 
   Widget _buildResultsRow(double maxWidth, double contentWidth) => Center(
     child: ConstrainedBox(
@@ -288,12 +298,17 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           15,
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Icon(Icons.bed_outlined, color: AppColors.darkGold, size: 18),
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                '${_rooms.length} Rooms Available',
+                maxWidth < 360
+                    ? '${_rooms.length} Rooms'
+                    : '${_rooms.length} Rooms Available',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 13,
@@ -301,37 +316,46 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 ),
               ),
             ),
-            const Text(
-              'Sort by: ',
-              style: TextStyle(color: AppColors.greyText, fontSize: 10),
-            ),
-            DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _sort,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: AppColors.navy,
+            const SizedBox(width: 8),
+            Flexible(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isDense: true,
+                  isExpanded: true,
+                  value: _sort,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: AppColors.navy,
+                  ),
+                  selectedItemBuilder: (context) => const [
+                    _SortLabel('Recommended'),
+                    _SortLabel('Price ↑'),
+                    _SortLabel('Price ↓'),
+                    _SortLabel('Rating'),
+                  ],
+                  items:
+                      [
+                        'Recommended',
+                        'Price Low to High',
+                        'Price High to Low',
+                        'Rating',
+                      ].map((sort) {
+                        return DropdownMenuItem(
+                          value: sort,
+                          child: Text(
+                            sort,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                  onChanged: (sort) {
+                    if (sort == null) return;
+                    setState(() => _sort = sort);
+                    _load();
+                  },
                 ),
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-                items:
-                    [
-                      'Recommended',
-                      'Price Low to High',
-                      'Price High to Low',
-                      'Rating',
-                    ].map((sort) {
-                      return DropdownMenuItem(value: sort, child: Text(sort));
-                    }).toList(),
-                onChanged: (sort) {
-                  if (sort == null) return;
-                  setState(() => _sort = sort);
-                  _load();
-                },
               ),
             ),
           ],
@@ -414,7 +438,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
             const SizedBox(height: 12),
             SelectableText(
               debugDetails,
-              style: const TextStyle(color: AppColors.greyText, fontSize: 11),
+              maxLines: 3,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.greyText, fontSize: 10),
             ),
           ],
           const SizedBox(height: 14),
@@ -571,6 +597,32 @@ class _RoomsNavigation extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _SortLabel extends StatelessWidget {
+  const _SortLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Icon(Icons.sort, size: 15, color: AppColors.navy),
+      const SizedBox(width: 4),
+      Flexible(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.navy,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ],
   );
 }
 
