@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../core/constants.dart';
 
@@ -73,6 +74,7 @@ class AuthService implements AuthRepository {
   FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
   FirebaseFirestore get _firestore =>
       _firestoreOverride ?? FirebaseFirestore.instance;
+  sb.SupabaseClient get _supabase => sb.Supabase.instance.client;
   static const _rememberKey = 'atithi_remember_me';
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   static bool _googleSignInInitialized = false;
@@ -99,7 +101,10 @@ class AuthService implements AuthRepository {
   @override
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
-  Future<String?> currentUserId() async => _auth.currentUser?.uid;
+  Future<String?> currentUserId() async =>
+      _auth.currentUser == null || _supabase.auth.currentSession == null
+      ? null
+      : _supabase.auth.currentUser?.id;
 
   Future<void> signUpWithEmail(
     String name,
@@ -110,6 +115,13 @@ class AuthService implements AuthRepository {
     String countryIso = 'IN',
   }) async {
     try {
+      await _supabase.auth.signUp(email: email.trim(), password: password);
+      if (_supabase.auth.currentSession == null) {
+        throw const AuthFailure(
+          AuthFailureCode.unknown,
+          'Please verify your email to finish setting up your account, then sign in again.',
+        );
+      }
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -141,6 +153,9 @@ class AuthService implements AuthRepository {
     } on FirebaseException catch (e) {
       debugPrint('Firebase error: ${e.code} - ${e.message}');
       rethrow;
+    } on sb.AuthException catch (e) {
+      debugPrint('Supabase auth error: ${e.code} - ${e.message}');
+      throw AuthFailure(AuthFailureCode.unknown, e.message);
     }
   }
 
@@ -150,6 +165,39 @@ class AuthService implements AuthRepository {
     bool rememberMe = true,
   }) async {
     try {
+      try {
+        await _supabase.auth.signInWithPassword(
+          email: email.trim(),
+          password: password,
+        );
+      } on sb.AuthException catch (e) {
+        if (e.code == 'invalid_credentials' ||
+            e.message.toLowerCase().contains('invalid login credentials')) {
+          // Migrate existing Firebase-only accounts using the same credentials.
+          try {
+            final provisioned = await _supabase.auth.signUp(
+              email: email.trim(),
+              password: password,
+            );
+            if (provisioned.session == null) {
+              throw const AuthFailure(
+                AuthFailureCode.unknown,
+                'Please verify your email to finish setting up wishlist access.',
+              );
+            }
+          } on sb.AuthException catch (provisionError) {
+            if (provisionError.message.toLowerCase().contains('already')) {
+              throw const AuthFailure(
+                AuthFailureCode.invalidCredentials,
+                'Email or password is incorrect.',
+              );
+            }
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
       final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -163,6 +211,9 @@ class AuthService implements AuthRepository {
     } on FirebaseException catch (e) {
       debugPrint('Firebase error: ${e.code} - ${e.message}');
       rethrow;
+    } on sb.AuthException catch (e) {
+      debugPrint('Supabase auth error: ${e.code} - ${e.message}');
+      throw AuthFailure(AuthFailureCode.unknown, e.message);
     }
   }
 
@@ -173,6 +224,18 @@ class AuthService implements AuthRepository {
       final UserCredential result;
       if (kIsWeb) {
         result = await _auth.signInWithPopup(GoogleAuthProvider());
+        final oauth = result.credential as OAuthCredential?;
+        final idToken = oauth?.idToken;
+        if (idToken == null) {
+          return const GoogleSignInResult.error(
+            'Google sign-in did not provide an ID token for wishlist access.',
+          );
+        }
+        await _supabase.auth.signInWithIdToken(
+          provider: sb.OAuthProvider.google,
+          idToken: idToken,
+          accessToken: oauth?.accessToken,
+        );
       } else {
         final account = await _googleSignIn.authenticate(
           scopeHint: const ['email', 'profile'],
@@ -185,6 +248,10 @@ class AuthService implements AuthRepository {
           return const GoogleSignInResult.error(message);
         }
         final credential = GoogleAuthProvider.credential(idToken: idToken);
+        await _supabase.auth.signInWithIdToken(
+          provider: sb.OAuthProvider.google,
+          idToken: idToken,
+        );
         result = await _auth.signInWithCredential(credential);
       }
       final user = result.user;
@@ -314,6 +381,7 @@ class AuthService implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    await _supabase.auth.signOut();
     if (!kIsWeb) {
       await initializeGoogleSignIn();
       await _googleSignIn.signOut();

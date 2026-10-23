@@ -48,6 +48,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   Future<void> _loadProfile() async {
     await Future<void>.delayed(Duration.zero);
     final user = firebase.FirebaseAuth.instance.currentUser;
+    final supabaseAuth = Supabase.instance.client.auth;
+    debugPrint(
+      'AUTH CHECK: firebaseUser=${user != null}, '
+      'supabaseSession=${supabaseAuth.currentSession != null}, '
+      'supabaseUser=${supabaseAuth.currentUser?.id ?? 'none'}',
+    );
     if (!mounted) return;
     setState(() {
       _profile = _ProfileData.fromFirebaseUser(user);
@@ -81,6 +87,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Future<bool> _signOut(BuildContext sheetContext) async {
     try {
+      await Supabase.instance.client.auth.signOut();
       await firebase.FirebaseAuth.instance.signOut();
       if (!mounted) return false;
       context.go('/auth');

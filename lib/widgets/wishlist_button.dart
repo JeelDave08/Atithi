@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/wishlist_provider.dart';
 import '../theme/app_colors.dart';
@@ -75,9 +77,15 @@ class _WishlistButtonState extends State<WishlistButton> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (saved == null) {
+      final error = wishlist.lastError;
+      final message = wishlist.lastErrorIsNetwork
+          ? 'No internet connection'
+          : kDebugMode && error is PostgrestException
+          ? "Couldn't update wishlist: ${error.message}"
+          : "Couldn't update wishlist";
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't update wishlist"),
+        SnackBar(
+          content: Text(message),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),

@@ -9,6 +9,7 @@ import 'core/router/app_router.dart';
 import 'core/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'providers/wishlist_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,9 @@ class AtithiApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Start the wishlist auth listener immediately so persisted Supabase
+    // sessions refresh saved room ids as soon as the app opens.
+    ref.watch(wishlistProvider);
     return MaterialApp.router(
       title: 'Atithi',
       debugShowCheckedModeBanner: false,

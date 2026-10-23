@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/wishlist_repository.dart';
 
@@ -19,7 +19,7 @@ final wishlistProvider = ChangeNotifierProvider<WishlistNotifier>((ref) {
 
 class WishlistNotifier extends ChangeNotifier {
   WishlistNotifier(this._repository) {
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       _onAuthChanged,
     );
     unawaited(refresh());
@@ -28,7 +28,20 @@ class WishlistNotifier extends ChangeNotifier {
   final WishlistRepository _repository;
   final Set<String> _roomIds = {};
   final Set<String> _inFlight = {};
-  late final StreamSubscription<User?> _authSubscription;
+  Object? _lastError;
+  Object? get lastError => _lastError;
+  bool get lastErrorIsNetwork {
+    final message = _lastError?.toString().toLowerCase() ?? '';
+    return message.contains('socketexception') ||
+        message.contains('timeoutexception') ||
+        message.contains('failed host lookup') ||
+        message.contains('clientexception') ||
+        message.contains('xmlhttprequest error') ||
+        message.contains('network is unreachable') ||
+        message.contains('connection refused');
+  }
+
+  late final StreamSubscription<AuthState> _authSubscription;
   bool loading = true;
   String? errorMessage;
   String? get currentUserId => _repository.currentUserId;
@@ -36,9 +49,11 @@ class WishlistNotifier extends ChangeNotifier {
   Set<String> get roomIds => Set.unmodifiable(_roomIds);
   bool isWishlisted(String roomId) => _roomIds.contains(roomId);
 
-  Future<void> _onAuthChanged(User? user) async {
+  Future<void> _onAuthChanged(AuthState state) async {
+    final user = state.session?.user;
     _roomIds.clear();
     errorMessage = null;
+    _lastError = null;
     notifyListeners();
     await refresh();
     if (user == null) return;
@@ -66,6 +81,7 @@ class WishlistNotifier extends ChangeNotifier {
     }
     loading = true;
     errorMessage = null;
+    _lastError = null;
     notifyListeners();
     try {
       final ids = await _repository.fetchWishlistRoomIds();
@@ -74,7 +90,8 @@ class WishlistNotifier extends ChangeNotifier {
         ..addAll(ids);
     } catch (error, stack) {
       errorMessage = error.toString();
-      if (kDebugMode) debugPrint('Wishlist refresh failed: $error\n$stack');
+      _lastError = error;
+      if (kDebugMode) debugPrint('WISHLIST ERROR (refresh): $error\n$stack');
     } finally {
       loading = false;
       notifyListeners();
@@ -106,7 +123,8 @@ class WishlistNotifier extends ChangeNotifier {
         _roomIds.remove(roomId);
       }
       errorMessage = error.toString();
-      if (kDebugMode) debugPrint('Wishlist update failed: $error\n$stack');
+      _lastError = error;
+      if (kDebugMode) debugPrint('WISHLIST ERROR (toggle): $error\n$stack');
       notifyListeners();
       return null;
     } finally {
