@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class AutoSlideRooms extends StatefulWidget {
   const AutoSlideRooms({
     required this.itemCount,
     required this.itemBuilder,
-    this.height = 450,
+    this.height = 540,
     super.key,
   });
 

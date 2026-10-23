@@ -1,8 +1,10 @@
 import 'package:atithi/models/room.dart';
 import 'package:atithi/property_experience.dart';
+import 'package:atithi/providers/rooms_provider.dart';
 import 'package:atithi/screens/rooms/widgets/room_card.dart';
 import 'package:atithi/screens/rooms/widgets/why_choose_atithi_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -57,6 +59,55 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('home room card fits long content with many amenities', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          roomsProvider.overrideWith(
+            (ref) async => [
+              const Room(
+                id: 'long-content-room',
+                roomName: 'Heritage Grand Suite',
+                roomType: 'Suite',
+                description: 'A beautifully appointed heritage suite with a private courtyard, handcrafted furnishings, and thoughtful modern comforts for a memorable stay.',
+                pricePerNight: 12500,
+                capacity: 4,
+                amenities: [
+                  'WiFi',
+                  'TV',
+                  'AC',
+                  'Mini Bar',
+                  'Balcony',
+                  'Work Desk',
+                  'Laundry',
+                ],
+                status: 'available',
+              ),
+            ],
+          ),
+        ],
+        child: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: MaterialApp(home: Scaffold(body: PropertyRoomsPreview())),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('Book Now'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _noop() {}

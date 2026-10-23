@@ -205,11 +205,8 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
                     child: const PropertyAboutPreview(),
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Why Choose Atithi?',
-                    child: const PropertyHighlightsPreview(),
-                  ),
+                const SliverToBoxAdapter(
+                  child: WhyChooseAtithiSection(),
                 ),
                 SliverToBoxAdapter(
                   child: _Section(
@@ -985,6 +982,16 @@ class _Section extends StatelessWidget {
         child,
       ],
     ),
+  );
+}
+
+class WhyChooseAtithiSection extends StatelessWidget {
+  const WhyChooseAtithiSection({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _Section(
+    title: 'Why Choose Atithi?',
+    child: PropertyHighlightsPreview(),
   );
 }
 

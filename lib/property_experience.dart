@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,6 +13,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'features/home/widgets/reveal_on_scroll.dart';
 import 'models/room.dart';
 import 'theme/app_colors.dart';
 import 'widgets/auto_slide_rooms.dart';
@@ -1386,6 +1388,7 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
+  final _phone = TextEditingController();
   final _subject = TextEditingController();
   final _message = TextEditingController();
   late Future<PropertyContent?> _property;
@@ -1401,6 +1404,7 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _phone.dispose();
     _subject.dispose();
     _message.dispose();
     super.dispose();
@@ -1413,11 +1417,13 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
       await widget.repository.createContactMessage(
         name: _name.text,
         email: _email.text,
+        phone: _phone.text,
         message: '${_subject.text.trim()}\n${_message.text.trim()}'.trim(),
       );
       if (!mounted) return;
       _name.clear();
       _email.clear();
+      _phone.clear();
       _subject.clear();
       _message.clear();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1530,6 +1536,27 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
                       return value!.trim().length > 254
                           ? 'Email address is too long.'
                           : null;
+                    },
+                  ),
+                  _ContactInput(
+                    controller: _phone,
+                    label: 'Mobile Number',
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    maxLength: 10,
+                    validator: (value) {
+                      final phone = value?.trim() ?? '';
+                      if (phone.isEmpty) {
+                        return 'Please enter your mobile number';
+                      }
+                      if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+                        return 'Enter a valid 10-digit mobile number';
+                      }
+                      return null;
                     },
                   ),
                   _ContactInput(
@@ -2106,9 +2133,8 @@ class PropertyRoomsPreview extends ConsumerWidget {
         final previewRooms = rooms.take(5).toList(growable: false);
         return AutoSlideRooms(
           itemCount: previewRooms.length,
-          itemBuilder: (context, index) => RepaintBoundary(
-            child: _RoomCard(room: previewRooms[index]),
-          ),
+          itemBuilder: (context, index) =>
+              RepaintBoundary(child: _RoomCard(room: previewRooms[index])),
         );
       },
     );
@@ -2165,7 +2191,7 @@ class _HomeServicesMarquee extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  _serviceIcon(service.iconName),
+                  serviceIcon(service.name),
                   color: _experienceGold,
                   size: 19,
                 ),
@@ -2417,7 +2443,7 @@ class _RoomCard extends StatelessWidget {
           onTap: () => openRoomDetails(context, room),
           child: _RoomImageCarousel(imageUrls: room.imageUrls, height: 175),
         ),
-        _roomDetails(context),
+        Expanded(child: _roomDetails(context)),
       ],
     ),
   );
@@ -2425,71 +2451,89 @@ class _RoomCard extends StatelessWidget {
   Widget _roomDetails(BuildContext context) => Padding(
     padding: const EdgeInsets.all(14),
     child: Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          room.roomName ?? 'Room',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: _experienceNavy,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${room.roomType?.isNotEmpty == true ? room.roomType : 'Room'} · ${room.capacity ?? 0} guests',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
-        ),
-        if (room.description?.isNotEmpty == true) ...[
-          const SizedBox(height: 5),
-          Text(
-            room.description!,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 12,
-              height: 1.35,
-            ),
-          ),
-        ],
-        const SizedBox(height: 7),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Text(
-                '₹${NumberFormat.decimalPattern('en_IN').format(room.pricePerNight ?? 0)} / night',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _experienceNavy,
-                  fontWeight: FontWeight.w700,
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  room.roomName ?? 'Room',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _experienceNavy,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  '${room.roomType?.isNotEmpty == true ? room.roomType : 'Room'} · ${room.capacity ?? 0} guests',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 13,
+                  ),
+                ),
+                if (room.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    room.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '₹${NumberFormat.decimalPattern('en_IN').format(room.pricePerNight ?? 0)} / night',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _experienceNavy,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _PropertyAvailabilityBadge(
+                      available: room.status?.toLowerCase() == 'available',
+                    ),
+                  ],
+                ),
+                if (room.amenities.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...room.amenities
+                          .take(4)
+                          .map(
+                            (amenity) => _PropertyAmenityChip(amenity: amenity),
+                          ),
+                      if (room.amenities.length > 4)
+                        _PropertyAmenityChip(
+                          amenity: '+${room.amenities.length - 4}',
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(width: 8),
-            _PropertyAvailabilityBadge(
-              available: room.status?.toLowerCase() == 'available',
-            ),
-          ],
-        ),
-        if (room.amenities.isNotEmpty) ...[
-          const SizedBox(height: 5),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: room.amenities
-                .take(5)
-                .map((amenity) => _PropertyAmenityChip(amenity: amenity))
-                .toList(),
           ),
-        ],
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -2597,7 +2641,7 @@ class _PropertyAmenityChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            icons[key] ?? Icons.check_rounded,
+            icons[key] ?? serviceIcon(amenity),
             size: 13,
             color: _experienceGold,
           ),
@@ -3005,16 +3049,20 @@ class _WhyAtithi extends StatelessWidget {
       crossAxisSpacing: 10,
       mainAxisExtent: 170,
     ),
-    itemBuilder: (context, index) => _WhyFlipTile(
-      index: index,
-      title: reasons[index].$1,
-      icon: reasons[index].$2,
-      detail: const [
-        'Spacious rooms with modern comfort.',
-        'Your safety comes first, always.',
-        'Our team is always one call away.',
-        'Book direct for honest prices.',
-      ][index],
+    itemBuilder: (context, index) => RevealOnScroll(
+      delay: Duration(milliseconds: index * 80),
+      slideFrom: const Offset(0, .14),
+      child: _WhyFlipTile(
+        index: index,
+        title: reasons[index].$1,
+        icon: reasons[index].$2,
+        detail: const [
+          'Spacious rooms with modern comfort.',
+          'Your safety comes first, always.',
+          'Our team is always one call away.',
+          'Book direct for honest prices.',
+        ][index],
+      ),
     ),
   );
 }
@@ -3036,135 +3084,154 @@ class _WhyFlipTile extends StatefulWidget {
 }
 
 class _WhyFlipTileState extends State<_WhyFlipTile>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _flip = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 800),
+    duration: const Duration(milliseconds: 500),
   );
+  late final AnimationController _tap = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 120),
+  );
+  late final Animation<double> _scale = Tween<double>(
+    begin: 1.0,
+    end: 0.96,
+  ).animate(CurvedAnimation(parent: _tap, curve: Curves.easeInOut));
   bool _reducedMotion = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reducedMotion = MediaQuery.disableAnimationsOf(context);
-    if (_reducedMotion) return;
-    Future<void>.delayed(Duration(milliseconds: widget.index * 220), () async {
-      if (!mounted || _reducedMotion) return;
-      await _flip.forward();
-      if (mounted) {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-      }
-      if (mounted) await _flip.reverse();
-    });
   }
 
   @override
   void dispose() {
     _flip.dispose();
+    _tap.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () {
-      if (!_reducedMotion) {
-        _flip.isCompleted ? _flip.reverse() : _flip.forward();
-      }
-    },
-    child: AnimatedBuilder(
-      animation: _flip,
-      builder: (context, _) {
-        final back = _flip.value >= .5;
-        return Transform(
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, .001)
-            ..rotateY(math.pi * _flip.value),
-          alignment: Alignment.center,
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: back ? _experienceNavy : _experienceCard,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: _experienceLightGold.withValues(alpha: .75),
-              ),
-            ),
-            child: back
-                ? Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.rotationY(math.pi),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(widget.icon, color: _experienceLightGold),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.detail,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: _experienceCream,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Stack(
-                    children: [
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Text(
-                          '0${widget.index + 1}',
-                          style: TextStyle(
-                            color: _experienceGold.withValues(alpha: .22),
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Center(
+  Widget build(BuildContext context) {
+    final curvedFlip = CurvedAnimation(
+      parent: _flip,
+      curve: Curves.easeInOutCubic,
+    );
+    return GestureDetector(
+      onTapDown: (_) {
+        if (!_reducedMotion) _tap.forward();
+      },
+      onTapUp: (_) {
+        if (!_reducedMotion) _tap.reverse();
+      },
+      onTapCancel: () {
+        if (!_reducedMotion) _tap.reverse();
+      },
+      onTap: () {
+        if (!_reducedMotion) {
+          _flip.isCompleted ? _flip.reverse() : _flip.forward();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: Listenable.merge([curvedFlip, _scale]),
+        builder: (context, _) {
+          final flipVal = curvedFlip.value;
+          final back = flipVal >= .5;
+          return Transform.scale(
+            scale: _scale.value,
+            child: Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, .001)
+                ..rotateY(math.pi * flipVal),
+              alignment: Alignment.center,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: back ? _experienceNavy : _experienceCard,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _experienceLightGold.withValues(alpha: .75),
+                  ),
+                ),
+                child: back
+                    ? Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.rotationY(math.pi),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: _experienceLightGold.withValues(
-                                  alpha: .3,
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                widget.icon,
-                                color: _experienceGold,
-                                size: 28,
-                              ),
-                            ),
+                            Icon(widget.icon, color: _experienceLightGold),
                             const SizedBox(height: 8),
                             Text(
-                              widget.title,
+                              widget.detail,
                               textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: _experienceNavy,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
+                                color: _experienceCream,
+                                fontSize: 12,
+                                height: 1.3,
                               ),
                             ),
                           ],
                         ),
+                      )
+                    : Stack(
+                        children: [
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Text(
+                              '0${widget.index + 1}',
+                              style: TextStyle(
+                                color: _experienceGold.withValues(alpha: .22),
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: _experienceLightGold.withValues(
+                                      alpha: .3,
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    widget.icon,
+                                    color: _experienceGold,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  widget.title,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _experienceNavy,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-          ),
-        );
-      },
-    ),
-  );
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _ServiceCard extends StatelessWidget {
@@ -3248,30 +3315,60 @@ class _ServiceVisual extends StatelessWidget {
   }
 }
 
-IconData _serviceIcon(String value) {
-  final name = value.toLowerCase();
-  if (name.contains('wifi')) {
+IconData _serviceIcon(String value) => serviceIcon(value);
+
+IconData serviceIcon(String name) {
+  final value = name.toLowerCase();
+  if (value.contains('wifi') ||
+      value.contains('wi-fi') ||
+      value.contains('internet')) {
     return Icons.wifi_rounded;
   }
-  if (name.contains('room') || name.contains('dining')) {
-    return Icons.room_service_outlined;
+  if (value.contains('housekeeping') || value.contains('cleaning')) {
+    return Icons.cleaning_services_rounded;
   }
-  if (name.contains('clean') || name.contains('housekeep')) {
-    return Icons.cleaning_services_outlined;
+  if (value.contains('iron')) return Icons.iron_rounded;
+  if (value.contains('laundry') || value.contains('washing')) {
+    return Icons.local_laundry_service_rounded;
   }
-  if (name.contains('airport') || name.contains('transfer')) {
-    return Icons.directions_car_outlined;
+  if (value.contains('breakfast') || value.contains('buffet')) {
+    return Icons.free_breakfast_rounded;
   }
-  if (name.contains('laundry')) {
-    return Icons.local_laundry_service_outlined;
+  if (value.contains('room service') ||
+      value.contains('food') ||
+      value.contains('dining') ||
+      value.contains('restaurant')) {
+    return Icons.room_service_rounded;
   }
-  if (name.contains('park')) {
-    return Icons.local_parking_outlined;
+  if (value.contains('parking') || value.contains('park')) {
+    return Icons.local_parking_rounded;
   }
-  if (name.contains('restaurant') || name.contains('food')) {
-    return Icons.restaurant_outlined;
+  if (value.contains('pool') || value.contains('swimming')) {
+    return Icons.pool_rounded;
   }
-  return Icons.support_agent_outlined;
+  if (value.contains('gym') || value.contains('fitness')) {
+    return Icons.fitness_center_rounded;
+  }
+  if (value.contains('spa') || value.contains('massage')) {
+    return Icons.spa_rounded;
+  }
+  if (value.contains('airport') ||
+      value.contains('pickup') ||
+      value.contains('taxi') ||
+      value.contains('transport') ||
+      value.contains('transfer')) {
+    return Icons.local_taxi_rounded;
+  }
+  if (value.contains('air condition') ||
+      RegExp(r'(^|\W)ac($|\W)').hasMatch(value)) {
+    return Icons.ac_unit_rounded;
+  }
+  if (value.contains('tv')) return Icons.tv_rounded;
+  if (value.contains('security')) return Icons.security_rounded;
+  if (value.contains('work desk') || value.contains('desk')) {
+    return Icons.desk_rounded;
+  }
+  return Icons.star_rounded;
 }
 
 class _ContactDetail extends StatelessWidget {
@@ -3317,12 +3414,16 @@ class _ContactInput extends StatelessWidget {
     required this.validator,
     required this.maxLength,
     this.keyboardType,
+    this.textInputAction,
+    this.inputFormatters,
     this.maxLines = 1,
   });
   final TextEditingController controller;
   final String label;
   final String? Function(String?) validator;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final List<TextInputFormatter>? inputFormatters;
   final int maxLines;
   final int maxLength;
 
@@ -3332,6 +3433,8 @@ class _ContactInput extends StatelessWidget {
     child: TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      inputFormatters: inputFormatters,
       maxLines: maxLines,
       maxLength: maxLength,
       validator: validator,

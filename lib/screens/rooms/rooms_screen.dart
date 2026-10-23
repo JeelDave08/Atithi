@@ -48,14 +48,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   List<Room> _rooms = [];
   List<String> _categories = [];
   Set<String> _favorites = {};
-  final Set<String> _amenities = {};
+  RoomFilters _filters = RoomFilters.empty();
   bool _loading = true;
   Object? _error;
   String? _debugError;
-  String _category = 'All';
   String _sort = 'Recommended';
-  String? _price;
-  String? _capacity;
 
   @override
   void initState() {
@@ -89,7 +86,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     setState(() => searchQuery = '');
   }
 
-  List<Room> applyFilters(List<Room> rooms) {
+  List<Room> applyFilters(List<Room> rooms, {RoomFilters? filters}) {
+    final active = filters ?? _filters;
     final rawQuery = searchQuery.toLowerCase().trim();
     final words = rawQuery
         .split(RegExp(r'\s+'))
@@ -97,17 +95,44 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         .where((word) => word.isNotEmpty)
         .toList();
     final filtered = rooms.where((room) {
-      if (_category != 'All' && room.roomType != _category) return false;
+      if (active.roomTypes.isNotEmpty &&
+          !active.roomTypes.any(
+            (type) =>
+                RoomFilters.roomTypeKey(type) ==
+                RoomFilters.roomTypeKey(room.roomType ?? ''),
+          )) {
+        return false;
+      }
       final price = room.pricePerNight ?? 0;
-      if (_price == 'Under 4000' && price >= 4000) return false;
-      if (_price == '4000-6000' && (price < 4000 || price > 6000)) return false;
-      if (_price == '6000+' && price <= 6000) return false;
+      if (active.priceRanges.isNotEmpty &&
+          !active.priceRanges.any((range) {
+            return switch (range) {
+              'Under 4000' => price < 4000,
+              '4000-6000' => price >= 4000 && price <= 6000,
+              '6000+' => price > 6000,
+              _ => false,
+            };
+          })) {
+        return false;
+      }
       final capacity = room.capacity ?? 0;
-      if (_capacity == '1-2' && (capacity < 1 || capacity > 2)) return false;
-      if (_capacity == '3-4' && (capacity < 3 || capacity > 4)) return false;
-      if (_capacity == '5+' && capacity < 5) return false;
-      if (_amenities.isNotEmpty &&
-          !_amenities.every((amenity) => room.amenities.contains(amenity))) {
+      if (active.capacities.isNotEmpty &&
+          !active.capacities.any((range) {
+            return switch (range) {
+              '1-2' => capacity >= 1 && capacity <= 2,
+              '3-4' => capacity >= 3 && capacity <= 4,
+              '5+' => capacity >= 5,
+              _ => false,
+            };
+          })) {
+        return false;
+      }
+      if (active.amenities.isNotEmpty &&
+          !active.amenities.every(
+            (amenity) => room.amenities.any(
+              (value) => _amenityFilterKey(value) == amenity,
+            ),
+          )) {
         return false;
       }
       if (rawQuery.isEmpty) return true;
@@ -171,7 +196,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           : await _service.fetchFavoriteIds(user.uid);
       if (!mounted) return;
       setState(() {
-        _categories = results[0] as List<String>;
+        _categories = RoomFilters.uniqueRoomTypes(results[0] as List<String>);
         _rooms = results[1] as List<Room>;
         _favorites = favorites;
         _error = null;
@@ -228,38 +253,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     }
   }
 
-  void _apply(String selection) {
-    final parts = selection.split('=');
-    if (parts.length != 2) return;
-
-    setState(() {
-      switch (parts[0]) {
-        case 'Price Range':
-          _price = parts[1] == 'Any' ? null : parts[1];
-        case 'Capacity':
-          _capacity = parts[1] == 'Any' ? null : parts[1];
-        case 'Room Type':
-          _category = parts[1] == 'Any' ? 'All' : parts[1];
-        case 'Amenities':
-          if (_amenities.contains(parts[1])) {
-            _amenities.remove(parts[1]);
-          } else {
-            _amenities.add(parts[1]);
-          }
-      }
-    });
-    _load();
-  }
-
-  void _clear() {
-    setState(() {
-      _price = null;
-      _capacity = null;
-      _category = 'All';
-      _amenities.clear();
-    });
-    _load();
-  }
+  void _applyFilters(RoomFilters filters) =>
+      setState(() => _filters = filters.copyWith());
 
   @override
   Widget build(BuildContext context) {
@@ -329,17 +324,21 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                           ),
                           child: RoomFilterBar(
                             categories: _categories,
-                            category: _category,
-                            price: _price,
-                            type: _category == 'All' ? null : _category,
-                            capacity: _capacity,
-                            amenities: _amenities,
+                            category: _filters.roomTypes.length == 1
+                                ? _filters.roomTypes.first
+                                : 'All',
+                            filters: _filters,
                             onCategory: (category) {
-                              setState(() => _category = category);
-                              _load();
+                              final selectedTypes = category == 'All'
+                                  ? <String>{}
+                                  : <String>{category};
+                              _applyFilters(
+                                _filters.copyWith(roomTypes: selectedTypes),
+                              );
                             },
-                            onFilter: _apply,
-                            onClear: _clear,
+                            onApply: _applyFilters,
+                            resultCount: (filters) =>
+                                applyFilters(_rooms, filters: filters).length,
                           ),
                         ),
                       ),
@@ -374,7 +373,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                                     'No rooms found',
                                     'Try changing or clearing your filters.',
                                     OutlinedButton(
-                                      onPressed: _clear,
+                                      onPressed: () =>
+                                          _applyFilters(RoomFilters.empty()),
                                       child: const Text('Clear filters'),
                                     ),
                                   ),
@@ -398,10 +398,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: contentWidth),
-                            child: const Padding(
-                              padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
-                              child: WhyChooseAtithiCard(),
-                            ),
+                            child: const WhyChooseAtithiCard(),
                           ),
                         ),
                       ),
@@ -730,6 +727,20 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
     );
   }
+}
+
+String _amenityFilterKey(String value) {
+  final key = value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  return switch (key) {
+    'wifi' || 'wirelessinternet' => 'wifi',
+    'tv' || 'television' => 'tv',
+    'ac' || 'aircondition' || 'airconditioning' || 'airconditioner' => 'ac',
+    'roomservice' => 'room_service',
+    'minibar' => 'mini_bar',
+    'kidsfriendly' || 'childfriendly' => 'kids_friendly',
+    'workdesk' || 'desk' => 'work_desk',
+    _ => key,
+  };
 }
 
 class _RoomsNavigation extends StatelessWidget {

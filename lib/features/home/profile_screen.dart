@@ -1,17 +1,21 @@
-import 'dart:ui' as ui;
+import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../screens/login_screen.dart';
 import '../../shared/widgets/sunset_widgets.dart';
+import '../../theme/app_colors.dart';
 
-const _profileNavy = Color(0xFF12284C);
-const _profileCream = Color(0xFFFAF3E4);
-const _profileGold = Color(0xFFD4A84F);
+const _profileNavy = AppColors.navy;
+const _profileCream = AppColors.cream;
+const _profileCard = AppColors.surface;
+const _profileGold = AppColors.gold;
 const _profileRed = Color(0xFFD9534F);
-const _profileMuted = Color(0xFFB9B9B5);
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,8 +27,16 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entranceController;
+  StreamSubscription<dynamic>? _supabaseAuthSubscription;
+  StreamSubscription<firebase.User?>? _firebaseAuthSubscription;
   _ProfileData? _profile;
-  bool _loading = true;
+  // Kept populated by the existing profile stats fetch; the redesigned UI omits stats.
+  // ignore: unused_field
+  int? _bookings;
+  // ignore: unused_field
+  int? _favorites;
+  bool _profileLoading = true;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -33,18 +45,108 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     );
+    _supabaseAuthSubscription = Supabase.instance.client.auth.onAuthStateChange
+        .listen((_) => _loadProfile());
+    _firebaseAuthSubscription = firebase.FirebaseAuth.instance
+        .authStateChanges()
+        .listen((_) => _loadProfile());
     _loadProfile();
   }
 
   Future<void> _loadProfile() async {
-    await Future<void>.delayed(Duration.zero);
-    final user = Supabase.instance.client.auth.currentUser;
+    final generation = ++_loadGeneration;
+    final supabase = Supabase.instance.client;
+    final supabaseUser = supabase.auth.currentUser;
+    final firebaseUser = firebase.FirebaseAuth.instance.currentUser;
+    final initial = _ProfileData.fromAuth(supabaseUser, firebaseUser);
     if (!mounted) return;
     setState(() {
-      _profile = _ProfileData.fromUser(user);
-      _loading = false;
+      _profile = initial;
+      _bookings = null;
+      _favorites = null;
+      _profileLoading = supabaseUser != null || firebaseUser != null;
     });
-    _entranceController.forward();
+    if (!_entranceController.isAnimating && _entranceController.value == 0) {
+      _entranceController.forward();
+    }
+
+    if (supabaseUser == null && firebaseUser == null) {
+      if (mounted) setState(() => _profileLoading = false);
+      return;
+    }
+
+    final userId = supabaseUser?.id ?? firebaseUser!.uid;
+    final profileFuture = _loadProfileRow(
+      supabaseUser: supabaseUser,
+      firebaseUser: firebaseUser,
+      userId: userId,
+    );
+    final statsFuture = _loadStats(
+      userId: userId,
+      isSupabaseUser: supabaseUser != null,
+      generation: generation,
+    );
+    final row = await profileFuture;
+    if (!mounted || generation != _loadGeneration) return;
+    setState(() {
+      _profile = initial.withProfileRow(row);
+      _profileLoading = false;
+    });
+    await statsFuture;
+  }
+
+  Future<Map<String, dynamic>?> _loadProfileRow({
+    required User? supabaseUser,
+    required firebase.User? firebaseUser,
+    required String userId,
+  }) async {
+    try {
+      if (supabaseUser != null) {
+        return await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', userId)
+            .maybeSingle();
+      }
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      return snapshot.data();
+    } catch (error, stack) {
+      debugPrint('Profile fetch failed: $error\n$stack');
+      return null;
+    }
+  }
+
+  Future<void> _loadStats({
+    required String userId,
+    required bool isSupabaseUser,
+    required int generation,
+  }) async {
+    final bookingColumn = isSupabaseUser ? 'user_id' : 'firebase_uid';
+    Future<int> count(String table, String column) async {
+      try {
+        final rows = await Supabase.instance.client
+            .from(table)
+            .select()
+            .eq(column, userId);
+        return rows.length;
+      } catch (error, stack) {
+        debugPrint('$table count failed: $error\n$stack');
+        return 0;
+      }
+    }
+
+    final counts = await Future.wait([
+      count('bookings', bookingColumn),
+      count('favorites', 'user_id'),
+    ]);
+    if (!mounted || generation != _loadGeneration) return;
+    setState(() {
+      _bookings = counts[0];
+      _favorites = counts[1];
+    });
   }
 
   Animation<double> _entrance(int step) => CurvedAnimation(
@@ -55,6 +157,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<bool> _signOut(BuildContext sheetContext) async {
     try {
       await Supabase.instance.client.auth.signOut();
+      if (firebase.FirebaseAuth.instance.currentUser != null) {
+        await firebase.FirebaseAuth.instance.signOut();
+      }
       if (!mounted) return false;
       Navigator.of(context).pushAndRemoveUntil<void>(
         MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
@@ -85,307 +190,210 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   void dispose() {
+    _supabaseAuthSubscription?.cancel();
+    _firebaseAuthSubscription?.cancel();
     _entranceController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _profileNavy,
-    body: Stack(
-      children: [
-        const _ProfileGlows(),
-        SafeArea(
-          bottom: false,
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: _profileGold),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    22,
-                    22,
-                    22,
-                    MediaQuery.paddingOf(context).bottom + 104,
+  Widget build(BuildContext context) {
+    final profile = _profile ?? _ProfileData.empty();
+    final namePending = _profileLoading && profile.name == null;
+    final phonePending = _profileLoading && profile.phone == null;
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ProfileSectionHeading('Profile', titleStyle: true),
+                  const SizedBox(height: 24),
+                  _Entrance(
+                    animation: _entrance(0),
+                    child: ProfileIdentity(
+                      name: profile.name ?? 'Not provided',
+                      email: profile.email ?? 'Not provided',
+                      initials: _profileInitials(profile.name),
+                      nameLoading: namePending,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Profile',
-                        style: GoogleFonts.playfairDisplay(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontStyle: FontStyle.italic,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _Entrance(
-                        animation: _entrance(0),
-                        child: ProfileHeader(
-                          name: _profile?.name ?? 'Not provided',
-                          bookings: '—',
-                          favorites: '—',
-                          memberSince: _profile?.memberSince ?? '—',
-                        ),
-                      ),
-                      const SizedBox(height: 27),
-                      Text(
-                        'PERSONAL DETAILS',
+                  const SizedBox(height: 28),
+                  const _ProfileSectionHeading('Personal Details'),
+                  const SizedBox(height: 16),
+                  _Entrance(
+                    animation: _entrance(1),
+                    child: InfoTile(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Name',
+                      value: profile.name ?? 'Not provided',
+                      isLoading: namePending,
+                      maxLines: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _Entrance(
+                    animation: _entrance(2),
+                    child: InfoTile(
+                      icon: Icons.mail_outline_rounded,
+                      label: 'Email',
+                      value: profile.email ?? 'Not provided',
+                      maxLines: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _Entrance(
+                    animation: _entrance(3),
+                    child: InfoTile(
+                      icon: Icons.phone_outlined,
+                      label: 'Phone',
+                      value: profile.phone ?? 'Not provided',
+                      isLoading: phonePending,
+                      maxLines: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: _showLogoutSheet,
+                      icon: const Icon(Icons.logout_rounded),
+                      label: Text(
+                        'Log out',
                         style: GoogleFonts.dmSans(
-                          color: _profileGold,
-                          fontSize: 11,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
                         ),
                       ),
-                      const SizedBox(height: 13),
-                      _Entrance(
-                        animation: _entrance(1),
-                        child: InfoTile(
-                          icon: Icons.person_outline_rounded,
-                          label: 'Name',
-                          value: _profile?.name ?? 'Not provided',
-                        ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _profileNavy,
+                        foregroundColor: Colors.white,
+                        shape: const StadiumBorder(),
                       ),
-                      const SizedBox(height: 11),
-                      _Entrance(
-                        animation: _entrance(2),
-                        child: InfoTile(
-                          icon: Icons.mail_outline_rounded,
-                          label: 'Email',
-                          value: _profile?.email ?? 'Not provided',
-                        ),
-                      ),
-                      const SizedBox(height: 11),
-                      _Entrance(
-                        animation: _entrance(3),
-                        child: InfoTile(
-                          icon: Icons.phone_outlined,
-                          label: 'Phone',
-                          value: _profile?.phone ?? 'Not provided',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: FilledButton.icon(
-                          onPressed: _showLogoutSheet,
-                          icon: const Icon(Icons.logout_rounded),
-                          label: Text(
-                            'Log out',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _profileCream,
-                            foregroundColor: _profileRed,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-        ),
-        const Align(
-          alignment: Alignment.bottomCenter,
-          child: FloatingBottomNav(selected: 4),
-        ),
-      ],
-    ),
-  );
+                ],
+              ),
+            ),
+          ),
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: FloatingBottomNav(selected: 4),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class ProfileHeader extends StatelessWidget {
-  const ProfileHeader({
+class ProfileIdentity extends StatelessWidget {
+  const ProfileIdentity({
     required this.name,
-    required this.bookings,
-    required this.favorites,
-    required this.memberSince,
+    required this.email,
+    required this.initials,
+    this.nameLoading = false,
     super.key,
   });
 
   final String name;
-  final String bookings;
-  final String favorites;
-  final String memberSince;
-
-  String get _initials {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty);
-    if (parts.isEmpty) return 'AT';
-    return parts.take(2).map((part) => part[0].toUpperCase()).join();
-  }
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    child: Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 48),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 61, 18, 17),
-            decoration: BoxDecoration(
-              color: _profileCream,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x30000000),
-                  blurRadius: 25,
-                  offset: Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.playfairDisplay(
-                    color: _profileNavy,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w600,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFF0D38D), _profileGold],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '★  ATITHI GUEST',
-                    style: GoogleFonts.dmSans(
-                      color: _profileNavy,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: StatItem(label: 'Bookings', value: bookings),
-                    ),
-                    _statDivider,
-                    Expanded(
-                      child: StatItem(label: 'Favorites', value: favorites),
-                    ),
-                    _statDivider,
-                    Expanded(
-                      child: StatItem(
-                        label: 'Member since',
-                        value: memberSince,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        _Avatar(initials: _initials),
-      ],
-    ),
-  );
-
-  static Widget get _statDivider => Container(
-    width: 1,
-    height: 35,
-    color: _profileGold.withValues(alpha: .45),
-  );
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials});
+  final String email;
   final String initials;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 96,
-    height: 96,
-    padding: const EdgeInsets.all(3),
-    decoration: const BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: SweepGradient(
-        colors: [
-          Color(0xFFA97926),
-          Color(0xFFFFE7A3),
-          _profileGold,
-          Color(0xFFA97926),
-        ],
-      ),
-    ),
-    child: Container(
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: _profileNavy,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: GoogleFonts.playfairDisplay(
-          color: _profileGold,
-          fontSize: 30,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ),
-  );
-}
-
-class StatItem extends StatelessWidget {
-  const StatItem({required this.label, required this.value, super.key});
-
-  final String label;
-  final String value;
+  final bool nameLoading;
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
+      Container(
+        width: 84,
+        height: 84,
+        decoration: BoxDecoration(
+          color: _profileNavy,
+          shape: BoxShape.circle,
+          border: Border.all(color: _profileGold, width: 2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          initials,
+          maxLines: 1,
+          style: GoogleFonts.playfairDisplay(
+            color: _profileGold,
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: nameLoading
+            ? const Center(child: _ProfileFieldShimmer(width: 150, height: 22))
+            : Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.playfairDisplay(
+                  color: _profileNavy,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+      ),
+      const SizedBox(height: 3),
+      SizedBox(
+        width: double.infinity,
+        child: Text(
+          email,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.dmSans(
+            color: AppColors.secondaryText,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+String _profileInitials(String? name) {
+  final value = name?.trim() ?? '';
+  if (value.isEmpty || value.toLowerCase() == 'not provided') return 'A';
+  final parts = value.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+  return parts.take(2).map((part) => part[0].toUpperCase()).join();
+}
+
+class _ProfileSectionHeading extends StatelessWidget {
+  const _ProfileSectionHeading(this.title, {this.titleStyle = false});
+
+  final String title;
+  final bool titleStyle;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       Text(
-        value,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        title,
         style: GoogleFonts.playfairDisplay(
           color: _profileNavy,
-          fontSize: 17,
+          fontSize: titleStyle ? 28 : 23,
           fontWeight: FontWeight.w700,
         ),
       ),
-      const SizedBox(height: 3),
-      Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.dmSans(
-          color: _profileNavy.withValues(alpha: .68),
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
+      const SizedBox(height: 7),
+      Container(
+        width: 66,
+        height: 3,
+        decoration: BoxDecoration(
+          color: _profileGold,
+          borderRadius: BorderRadius.circular(4),
         ),
       ),
     ],
@@ -397,69 +405,63 @@ class InfoTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.isLoading = false,
+    this.maxLines = 1,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final bool isLoading;
+  final int maxLines;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(20),
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-      child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(minHeight: 78),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .07),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _profileGold.withValues(alpha: .28)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: _profileGold.withValues(alpha: .16),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: _profileGold, size: 22),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.dmSans(
-                      color: _profileMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
+  Widget build(BuildContext context) => Card(
+    color: _profileCard,
+    elevation: 2,
+    margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: _profileGold, size: 26),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(
+                    color: AppColors.secondaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
-                  const SizedBox(height: 3),
+                ),
+                const SizedBox(height: 3),
+                if (isLoading)
+                  const _ProfileFieldShimmer(width: 120, height: 14)
+                else
                   Text(
                     value,
-                    maxLines: 2,
+                    maxLines: maxLines,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.dmSans(
-                      color: Colors.white,
+                      color: _profileNavy,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -589,35 +591,25 @@ class _Entrance extends StatelessWidget {
   );
 }
 
-class _ProfileGlows extends StatelessWidget {
-  const _ProfileGlows();
+class _ProfileFieldShimmer extends StatelessWidget {
+  const _ProfileFieldShimmer({required this.width, required this.height});
+
+  final double width;
+  final double height;
 
   @override
-  Widget build(BuildContext context) => const Stack(
-    children: [
-      Positioned(top: -130, right: -115, child: _GlowCircle(size: 290)),
-      Positioned(bottom: 60, left: -175, child: _GlowCircle(size: 340)),
-    ],
-  );
-}
-
-class _GlowCircle extends StatelessWidget {
-  const _GlowCircle({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: RadialGradient(
-        colors: [
-          _profileGold.withValues(alpha: .19),
-          _profileGold.withValues(alpha: .06),
-          Colors.transparent,
-        ],
-        stops: const [0, .45, 1],
+  Widget build(BuildContext context) => Shimmer.fromColors(
+    baseColor: Colors.white.withValues(alpha: .10),
+    highlightColor: _profileGold.withValues(alpha: .42),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(height / 2),
+        ),
       ),
     ),
   );
@@ -636,18 +628,57 @@ class _ProfileData {
   final String? phone;
   final String? memberSince;
 
-  factory _ProfileData.fromUser(User? user) {
-    final metadata = user?.userMetadata ?? const <String, dynamic>{};
-    final name =
-        _nonEmpty(metadata['full_name']) ?? _nonEmpty(metadata['name']);
-    final phone = _nonEmpty(user?.phone) ?? _nonEmpty(metadata['phone']);
-    final createdAt = DateTime.tryParse(user?.createdAt ?? '');
+  factory _ProfileData.empty() => const _ProfileData(
+    name: null,
+    email: null,
+    phone: null,
+    memberSince: null,
+  );
+
+  factory _ProfileData.fromAuth(
+    User? supabaseUser,
+    firebase.User? firebaseUser,
+  ) {
+    final metadata = supabaseUser?.userMetadata ?? const <String, dynamic>{};
+    final email =
+        _nonEmpty(supabaseUser?.email) ?? _nonEmpty(firebaseUser?.email);
+    final name = supabaseUser != null
+        ? _nonEmpty(metadata['full_name']) ??
+              _nonEmpty(metadata['name']) ??
+              _nonEmpty(metadata['display_name']) ??
+              _nonEmpty(metadata['fullName']) ??
+              _emailName(email)
+        : _nonEmpty(firebaseUser?.displayName) ?? _emailName(email);
+    final phone =
+        _nonEmpty(supabaseUser?.phone) ??
+        _nonEmpty(metadata['phone']) ??
+        _nonEmpty(firebaseUser?.phoneNumber);
+    final createdAt =
+        DateTime.tryParse(supabaseUser?.createdAt ?? '') ??
+        firebaseUser?.metadata.creationTime;
     return _ProfileData(
       name: name,
-      email: _nonEmpty(user?.email),
+      email: email,
       phone: phone,
       memberSince: createdAt?.year.toString(),
     );
+  }
+
+  _ProfileData withProfileRow(Map<String, dynamic>? data) {
+    if (data == null) return this;
+    return _ProfileData(
+      name: _nonEmpty(data['full_name']) ?? _nonEmpty(data['name']) ?? name,
+      email: email,
+      phone: _nonEmpty(data['phone']) ?? phone,
+      memberSince: memberSince,
+    );
+  }
+
+  static String? _emailName(String? email) {
+    if (email == null) return null;
+    final localPart = email.split('@').first.trim();
+    if (localPart.isEmpty) return null;
+    return '${localPart[0].toUpperCase()}${localPart.substring(1)}';
   }
 
   static String? _nonEmpty(Object? value) {
