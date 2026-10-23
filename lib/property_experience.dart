@@ -15,6 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core/image_utils.dart';
 import 'models/room.dart';
 import 'theme/app_colors.dart';
+import 'widgets/auto_slide_rooms.dart';
+import 'widgets/auto_slide_services.dart';
 
 const _experienceCream = AppColors.cream;
 const _experienceCard = AppColors.surface;
@@ -2124,30 +2126,12 @@ class PropertyRoomsPreview extends StatelessWidget {
         if (rooms.isEmpty) {
           return const _InlineDataState(text: 'No rooms are available yet.');
         }
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth =
-                constraints.maxWidth * (constraints.maxWidth > 700 ? .42 : .88);
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final room in rooms.take(5))
-                    SizedBox(
-                      width: cardWidth,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: RepaintBoundary(
-                          child: _RoomCard(room: PropertyRoom.fromRoom(room)),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
+        final previewRooms = rooms.take(5).toList(growable: false);
+        return AutoSlideRooms(
+          itemCount: previewRooms.length,
+          itemBuilder: (context, index) => RepaintBoundary(
+            child: _RoomCard(room: PropertyRoom.fromRoom(previewRooms[index])),
+          ),
         );
       },
     );
@@ -2185,16 +2169,14 @@ class _HomeServicesMarquee extends StatelessWidget {
     final chipWidth = (MediaQuery.sizeOf(context).width * .58)
         .clamp(150.0, 230.0)
         .toDouble();
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: services.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 9),
-        itemBuilder: (context, index) {
-          final service = services[index];
-          return Container(
+    return AutoSlideServices(
+      itemCount: services.length,
+      itemExtent: chipWidth + 9,
+      itemBuilder: (context, index) {
+        final service = services[index];
+        return Padding(
+          padding: const EdgeInsets.only(right: 9),
+          child: Container(
             width: chipWidth,
             height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2225,9 +2207,9 @@ class _HomeServicesMarquee extends StatelessWidget {
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

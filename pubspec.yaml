@@ -79,6 +79,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/atithi_logo.png
+    - assets/images/heritage_hero_bg.png
+    - assets/images/heritage_arch.png
     - assets/splash_logo.png
     - assets/splash_logo_android12.png
     - assets/icon/

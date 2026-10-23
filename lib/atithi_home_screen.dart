@@ -5,16 +5,16 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-import 'theme/app_colors.dart';
 import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
+import 'theme/app_colors.dart';
+import 'widgets/logout_dialog.dart';
 
 const _cream = AppColors.cream;
 const _cardCream = AppColors.surface;
 const _navy = AppColors.navy;
 const _gold = AppColors.gold;
-const _lightGold = AppColors.gold;
-const _mainText = AppColors.navy;
+const _secondaryText = AppColors.secondaryText;
 
 class AtithiHomeScreen extends StatefulWidget {
   const AtithiHomeScreen({super.key});
@@ -25,8 +25,7 @@ class AtithiHomeScreen extends StatefulWidget {
 
 class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
   late DateTime _checkIn = _dateOnly(DateTime.now());
-  late DateTime _checkOut = _dateOnly(DateTime.now())
-      .add(const Duration(days: 1));
+  late DateTime _checkOut = _dateOnly(DateTime.now()).add(const Duration(days: 1));
   int _adults = 2;
   int _children = 0;
 
@@ -55,9 +54,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
     final firstCheckout = _checkIn.add(const Duration(days: 1));
     final selected = await showDatePicker(
       context: context,
-      initialDate: _checkOut.isBefore(firstCheckout)
-          ? firstCheckout
-          : _checkOut,
+      initialDate: _checkOut.isBefore(firstCheckout) ? firstCheckout : _checkOut,
       firstDate: firstCheckout,
       lastDate: _checkIn.add(const Duration(days: 730)),
       builder: _datePickerTheme,
@@ -72,7 +69,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
         primary: _navy,
         onPrimary: _cream,
         surface: _cream,
-        onSurface: _mainText,
+        onSurface: _navy,
       ),
     ),
     child: child!,
@@ -107,135 +104,144 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _cream,
-    body: SafeArea(
-      bottom: false,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: _HomeHeader(
-              onMenuSelected: (item) {
-                switch (item) {
-                  case 'About Atithi':
-                    context.push('/about');
-                  case 'Contact Us':
-                    context.push('/contact');
-                  case 'Our Services':
-                    context.push('/services');
-                }
-              },
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
-              child: Text(
-                'More than just a stay',
-                style: GoogleFonts.playfairDisplay(
-                  color: _navy,
-                  fontSize: 29,
-                  height: 1.08,
-                  fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _cream,
+      body: SafeArea(
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth > 560;
+            final content = CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _HomeHeader(
+                    onMenuSelected: (item) {
+                      switch (item) {
+                        case 'About Atithi':
+                          context.push('/about');
+                        case 'Contact Us':
+                          context.push('/contact');
+                        case 'Our Services':
+                          context.push('/services');
+                        case 'Log out':
+                          showLogoutDialog(context);
+                      }
+                    },
+                  ),
                 ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: HeroSection(onTap: _openRoomListing),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-              child: Transform.translate(
-                offset: const Offset(0, -30),
-                child: BookingCard(
-                  checkIn: _checkIn,
-                  checkOut: _checkOut,
-                  adults: _adults,
-                  children: _children,
-                  onCheckInTap: _selectCheckIn,
-                  onCheckOutTap: _selectCheckOut,
-                  onAdultsChange: (value) =>
-                      _changeCount(adults: true, change: value),
-                  onChildrenChange: (value) =>
-                      _changeCount(adults: false, change: value),
-                  onSearch: _openRoomListing,
+                SliverToBoxAdapter(
+                  child: HeroSection(onTap: _openRoomListing),
                 ),
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: _TrustStrip()),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'Explore Atithi',
-              child: _QuickAccessRow(
-                onTap: (title) {
-                  switch (title) {
-                    case 'Our Rooms':
-                      _openRoomListing();
-                    case 'Amenities':
-                      context.push('/services');
-                    case 'Services':
-                      context.push('/services');
-                    case 'About Us':
-                      context.push('/about');
-                    case 'Contact Us':
-                      context.push('/contact');
-                  }
-                },
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'Our Rooms',
-              actionLabel: 'View All',
-              onAction: _openRoomListing,
-              child: const PropertyRoomsPreview(),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'Our Services',
-              actionLabel: 'View All',
-              onAction: () => context.push('/services'),
-              child: const PropertyServicesPreview(),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'About Atithi',
-              actionLabel: 'Learn More',
-              onAction: () => context.push('/about'),
-              child: const PropertyAboutPreview(),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'Why Choose Atithi?',
-              child: const PropertyHighlightsPreview(),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _Section(
-              title: 'Contact Us',
-              actionLabel: 'Get in Touch',
-              onAction: () => context.push('/contact'),
-              child: _ContactCard(onTap: () => context.push('/contact')),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 100),
-          ),
-        ],
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Transform.translate(
+                      offset: const Offset(0, -26),
+                      child: BookingCard(
+                        checkIn: _checkIn,
+                        checkOut: _checkOut,
+                        adults: _adults,
+                        children: _children,
+                        onCheckInTap: _selectCheckIn,
+                        onCheckOutTap: _selectCheckOut,
+                        onAdultsChange: (value) =>
+                            _changeCount(adults: true, change: value),
+                        onChildrenChange: (value) =>
+                            _changeCount(adults: false, change: value),
+                        onSearch: _openRoomListing,
+                      ),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 0),
+                    child: _TrustStrip(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Explore Atithi',
+                    child: _QuickAccessRow(
+                      onTap: (title) {
+                        switch (title) {
+                          case 'Our Rooms':
+                            _openRoomListing();
+                          case 'Amenities':
+                            context.push('/services');
+                          case 'Services':
+                            context.push('/services');
+                          case 'About Us':
+                            context.push('/about');
+                          case 'Contact Us':
+                            context.push('/contact');
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Our Rooms',
+                    actionLabel: 'View All',
+                    onAction: _openRoomListing,
+                    child: const PropertyRoomsPreview(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Our Services',
+                    actionLabel: 'View All',
+                    onAction: () => context.push('/services'),
+                    child: const PropertyServicesPreview(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'About Atithi',
+                    actionLabel: 'Learn More',
+                    onAction: () => context.push('/about'),
+                    child: const PropertyAboutPreview(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Why Choose Atithi?',
+                    child: const PropertyHighlightsPreview(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Section(
+                    title: 'Contact Us',
+                    actionLabel: 'Get in Touch',
+                    onAction: () => context.push('/contact'),
+                    child: _ContactCard(onTap: () => context.push('/contact')),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 40,
+                  ),
+                ),
+              ],
+            );
+
+            if (isDesktop) {
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: content,
+                ),
+              );
+            }
+            return content;
+          },
+        ),
       ),
-    ),
-    bottomNavigationBar: const BottomNav(),
-  );
+      bottomNavigationBar: const BottomNav(),
+    );
+  }
 }
 
 class _HomeHeader extends StatelessWidget {
@@ -244,24 +250,25 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 8, 14, 0),
+    padding: const EdgeInsets.fromLTRB(22, 10, 18, 4),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'ATITHI',
               style: GoogleFonts.playfairDisplay(
                 color: _navy,
-                fontSize: 31,
-                height: 1,
-                letterSpacing: 2.2,
+                fontSize: 32,
+                height: 1.0,
+                letterSpacing: 2.8,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             const _OrnamentDivider(),
           ],
         ),
@@ -270,14 +277,54 @@ class _HomeHeader extends StatelessWidget {
           tooltip: 'Open menu',
           onSelected: onMenuSelected,
           color: _cardCream,
-          icon: const Icon(Icons.menu_rounded, color: _navy, size: 27),
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: _gold.withValues(alpha: 0.3)),
+          ),
+          icon: const _HamburgerIcon(),
           itemBuilder: (_) => const [
             PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
             PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
             PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'Log out',
+              child: Row(
+                children: [
+                  Icon(Icons.logout, color: _navy, size: 18),
+                  SizedBox(width: 8),
+                  Text('Log out'),
+                ],
+              ),
+            ),
           ],
         ),
       ],
+    ),
+  );
+}
+
+class _HamburgerIcon extends StatelessWidget {
+  const _HamburgerIcon();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 24,
+    height: 16,
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(
+        3,
+        (_) => Container(
+          height: 2.2,
+          decoration: BoxDecoration(
+            color: _navy,
+            borderRadius: BorderRadius.circular(1.5),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -286,26 +333,82 @@ class _OrnamentDivider extends StatelessWidget {
   const _OrnamentDivider();
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 124,
-    child: Row(
-      children: [
-        Expanded(
-          child: Container(height: 1, color: _gold.withValues(alpha: .65)),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7),
-          child: Transform.rotate(
-            angle: math.pi / 4,
-            child: Container(width: 7, height: 7, color: _gold),
-          ),
-        ),
-        Expanded(
-          child: Container(height: 1, color: _gold.withValues(alpha: .65)),
-        ),
-      ],
-    ),
+  Widget build(BuildContext context) => const SizedBox(
+    width: 116,
+    height: 12,
+    child: CustomPaint(painter: _FlowerOrnamentPainter()),
   );
+}
+
+class _FlowerOrnamentPainter extends CustomPainter {
+  const _FlowerOrnamentPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = _gold
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke;
+    final fillPaint = Paint()
+      ..color = _gold
+      ..style = PaintingStyle.fill;
+
+    final cy = size.height / 2;
+    final cx = size.width / 2;
+
+    // Horizontal accent lines
+    canvas.drawLine(Offset(0, cy), Offset(cx - 12, cy), linePaint);
+    canvas.drawLine(Offset(cx + 12, cy), Offset(size.width, cy), linePaint);
+
+    // 4-petal flower emblem
+    // Top petal
+    final topPetal = Path()
+      ..moveTo(cx, cy - 1)
+      ..lineTo(cx - 2.5, cy - 4)
+      ..lineTo(cx, cy - 6.5)
+      ..lineTo(cx + 2.5, cy - 4)
+      ..close();
+    canvas.drawPath(topPetal, fillPaint);
+
+    // Bottom petal
+    final bottomPetal = Path()
+      ..moveTo(cx, cy + 1)
+      ..lineTo(cx - 2.5, cy + 4)
+      ..lineTo(cx, cy + 6.5)
+      ..lineTo(cx + 2.5, cy + 4)
+      ..close();
+    canvas.drawPath(bottomPetal, fillPaint);
+
+    // Left petal
+    final leftPetal = Path()
+      ..moveTo(cx - 1, cy)
+      ..lineTo(cx - 4, cy - 2.5)
+      ..lineTo(cx - 6.5, cy)
+      ..lineTo(cx - 4, cy + 2.5)
+      ..close();
+    canvas.drawPath(leftPetal, fillPaint);
+
+    // Right petal
+    final rightPetal = Path()
+      ..moveTo(cx + 1, cy)
+      ..lineTo(cx + 4, cy - 2.5)
+      ..lineTo(cx + 6.5, cy)
+      ..lineTo(cx + 4, cy + 2.5)
+      ..close();
+    canvas.drawPath(rightPetal, fillPaint);
+
+    // Center small diamond
+    final centerDiamond = Path()
+      ..moveTo(cx, cy - 1.8)
+      ..lineTo(cx + 1.8, cy)
+      ..lineTo(cx, cy + 1.8)
+      ..lineTo(cx - 1.8, cy)
+      ..close();
+    canvas.drawPath(centerDiamond, fillPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlowerOrnamentPainter oldDelegate) => false;
 }
 
 class HeroSection extends StatelessWidget {
@@ -313,273 +416,446 @@ class HeroSection extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final height = (constraints.maxWidth * .76)
-          .clamp(230.0, 360.0)
-          .toDouble();
-      return Semantics(
-        image: true,
-        label: 'Palace viewed through a heritage archway with a lantern and plants',
-        child: Material(
-          color: _cardCream,
-          borderRadius: BorderRadius.circular(26),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: SizedBox(
-              height: height,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: const _HeritageArchPainter(),
-                child: const SizedBox.expand(),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Background realistic heritage hotel archway photograph
+          AspectRatio(
+            aspectRatio: 575 / 427,
+            child: Image.asset(
+              'assets/images/heritage_hero_bg.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+          // Headline positioned gracefully in top-left cream area
+          Positioned(
+            top: 22,
+            left: 22,
+            child: Text(
+              'More than\njust a stay',
+              style: GoogleFonts.playfairDisplay(
+                color: _navy,
+                fontSize: 34,
+                height: 1.15,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-        ),
-      );
-    },
+        ],
+      ),
+    );
+  }
+}
+
+class BookingCard extends StatelessWidget {
+  const BookingCard({
+    super.key,
+    required this.checkIn,
+    required this.checkOut,
+    required this.adults,
+    required this.children,
+    required this.onCheckInTap,
+    required this.onCheckOutTap,
+    required this.onAdultsChange,
+    required this.onChildrenChange,
+    required this.onSearch,
+  });
+
+  final DateTime checkIn;
+  final DateTime checkOut;
+  final int adults;
+  final int children;
+  final VoidCallback onCheckInTap;
+  final VoidCallback onCheckOutTap;
+  final ValueChanged<int> onAdultsChange;
+  final ValueChanged<int> onChildrenChange;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+      decoration: BoxDecoration(
+        color: _cardCream,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1810284B),
+            blurRadius: 28,
+            spreadRadius: 0,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Date Row
+          Row(
+            children: [
+              Expanded(
+                child: _DateField(
+                  label: 'Check-in',
+                  date: checkIn,
+                  onTap: onCheckInTap,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 38,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                color: _gold.withValues(alpha: 0.35),
+              ),
+              Expanded(
+                child: _DateField(
+                  label: 'Check-out',
+                  date: checkOut,
+                  onTap: onCheckOutTap,
+                ),
+              ),
+            ],
+          ),
+          // Subtle Gold Separator
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(vertical: 16),
+            color: _gold.withValues(alpha: 0.35),
+          ),
+          // Guests Row
+          Row(
+            children: [
+              Expanded(
+                child: _GuestCounter(
+                  iconWidget: const Icon(
+                    Icons.person_outline_rounded,
+                    color: _navy,
+                    size: 26,
+                  ),
+                  label: 'Adults',
+                  count: adults,
+                  onDecrement: () => onAdultsChange(-1),
+                  onIncrement: () => onAdultsChange(1),
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 38,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                color: _gold.withValues(alpha: 0.35),
+              ),
+              Expanded(
+                child: _GuestCounter(
+                  iconWidget: const _ChildFaceIcon(size: 26, color: _navy),
+                  label: 'Children',
+                  count: children,
+                  onDecrement: () => onChildrenChange(-1),
+                  onIncrement: () => onChildrenChange(1),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Large Navy "Find a stay  →" Button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: Material(
+              color: _navy,
+              borderRadius: BorderRadius.circular(28),
+              elevation: 0,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(28),
+                onTap: onSearch,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Find a stay',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField({
+    required this.label,
+    required this.date,
+    required this.onTap,
+  });
+
+  final String label;
+  final DateTime date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(12),
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.calendar_today_outlined,
+            color: _navy,
+            size: 23,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _secondaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  DateFormat('EEE, d MMM').format(date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 
-class _HeritageArchPainter extends CustomPainter {
-  const _HeritageArchPainter();
+class _GuestCounter extends StatelessWidget {
+  const _GuestCounter({
+    required this.iconWidget,
+    required this.label,
+    required this.count,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final Widget iconWidget;
+  final String label;
+  final int count;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        iconWidget,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _secondaryText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: _navy,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  _CircleRoundButton(
+                    icon: Icons.remove,
+                    onTap: onDecrement,
+                  ),
+                  const SizedBox(width: 6),
+                  _CircleRoundButton(
+                    icon: Icons.add,
+                    onTap: onIncrement,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CircleRoundButton extends StatelessWidget {
+  const _CircleRoundButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xFFEFE8D8),
+    shape: const CircleBorder(),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        width: 30,
+        height: 30,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 16,
+            color: _navy,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ChildFaceIcon extends StatelessWidget {
+  const _ChildFaceIcon({this.size = 24, this.color = _navy});
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(painter: _ChildFacePainter(color: color)),
+  );
+}
+
+class _ChildFacePainter extends CustomPainter {
+  const _ChildFacePainter({required this.color});
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final arch = Path()
-      ..moveTo(w * .11, h)
-      ..lineTo(w * .11, h * .42)
-      ..cubicTo(w * .11, h * .12, w * .89, h * .12, w * .89, h * .42)
-      ..lineTo(w * .89, h)
-      ..close();
-    final outer = Paint()..color = _navy;
-    canvas.drawPath(arch, outer);
-    final innerArch = Path()
-      ..moveTo(w * .16, h)
-      ..lineTo(w * .16, h * .43)
-      ..cubicTo(w * .16, h * .17, w * .84, h * .17, w * .84, h * .43)
-      ..lineTo(w * .84, h)
-      ..close();
-    canvas.drawPath(innerArch, Paint()..color = const Color(0xFFF0DFBD));
-
-    canvas.save();
-    canvas.clipPath(innerArch);
-    final sky = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [_cardCream, Color(0xFFE8D6AE)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, sky);
-    final distantHills = Path()
-      ..moveTo(w * .14, h * .76)
-      ..quadraticBezierTo(w * .36, h * .44, w * .57, h * .7)
-      ..quadraticBezierTo(w * .73, h * .5, w * .87, h * .73)
-      ..lineTo(w * .87, h)
-      ..lineTo(w * .14, h)
-      ..close();
-    canvas.drawPath(
-      distantHills,
-      Paint()..color = _gold.withValues(alpha: .58),
-    );
-    final hills = Path()
-      ..moveTo(w * .14, h * .83)
-      ..quadraticBezierTo(w * .36, h * .61, w * .57, h * .81)
-      ..quadraticBezierTo(w * .75, h * .63, w * .87, h * .8)
-      ..lineTo(w * .87, h)
-      ..lineTo(w * .14, h)
-      ..close();
-    canvas.drawPath(hills, Paint()..color = _navy.withValues(alpha: .75));
-    _drawPalace(canvas, w, h);
-    canvas.restore();
-
-    final trim = Paint()
+    final stroke = Paint()
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..color = _gold;
-    canvas.drawPath(arch, trim);
-    final innerTrim = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = _cardCream.withValues(alpha: .8);
-    canvas.drawPath(innerArch, innerTrim);
-    _drawLantern(canvas, w * .16, h * .49, math.min(w, h) * .095);
-    _drawPlant(canvas, w * .24, h * .92, math.min(w, h) * .19);
-    _drawBananaLeaves(canvas, w * .12, h * .94, math.min(w, h) * .26);
-  }
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
 
-  void _drawPalace(Canvas canvas, double w, double h) {
-    final palace = Paint()..color = _navy;
-    final gold = Paint()..color = _gold;
-    final baseY = h * .77;
-    canvas.drawRect(Rect.fromLTWH(w * .39, h * .58, w * .24, h * .19), palace);
-    canvas.drawRect(Rect.fromLTWH(w * .34, h * .67, w * .34, h * .1), gold);
-    canvas.drawRect(Rect.fromLTWH(w * .37, h * .69, w * .28, h * .08), palace);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * .44, h * .49, w * .14, h * .1),
-        const Radius.circular(24),
-      ),
-      palace,
+    final center = Offset(size.width * 0.5, size.height * 0.53);
+    final radius = size.width * 0.35;
+
+    // Face circle
+    canvas.drawCircle(center, radius, stroke);
+
+    // Left ear
+    canvas.drawArc(
+      Rect.fromCircle(center: Offset(center.dx - radius, center.dy), radius: 2.8),
+      -math.pi / 2,
+      math.pi,
+      false,
+      stroke,
     );
-    canvas.drawCircle(Offset(w * .51, h * .49), w * .055, gold);
-    canvas.drawRect(Rect.fromLTWH(w * .47, h * .51, w * .08, h * .1), palace);
-    for (final x in [w * .41, w * .48, w * .55, w * .61]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, h * .61, w * .025, h * .045),
-          const Radius.circular(4),
-        ),
-        Paint()..color = _gold,
+    // Right ear
+    canvas.drawArc(
+      Rect.fromCircle(center: Offset(center.dx + radius, center.dy), radius: 2.8),
+      -math.pi / 2,
+      math.pi,
+      false,
+      stroke,
+    );
+
+    // Eyes
+    canvas.drawCircle(Offset(center.dx - 3.6, center.dy - 1.5), 1.2, fill);
+    canvas.drawCircle(Offset(center.dx + 3.6, center.dy - 1.5), 1.2, fill);
+
+    // Friendly smile
+    final smileRect = Rect.fromCenter(
+      center: Offset(center.dx, center.dy + 2),
+      width: 7,
+      height: 4.8,
+    );
+    canvas.drawArc(smileRect, 0.25, math.pi - 0.5, false, stroke);
+
+    // Top hair curl
+    final hair = Path()
+      ..moveTo(center.dx - 2, center.dy - radius)
+      ..cubicTo(
+        center.dx - 4,
+        center.dy - radius - 5,
+        center.dx + 3.5,
+        center.dy - radius - 4.5,
+        center.dx + 0.5,
+        center.dy - radius + 1,
       );
-    }
-    canvas.drawRect(
-      Rect.fromLTWH(w * .45, baseY - h * .045, w * .12, h * .045),
-      gold,
-    );
-  }
-
-  void _drawLantern(Canvas canvas, double x, double y, double radius) {
-    final glow = Paint()..color = _gold.withValues(alpha: .24);
-    canvas.drawCircle(Offset(x, y), radius * .95, glow);
-    final metal = Paint()
-      ..color = _navy
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawLine(
-      Offset(x, y - radius * 1.5),
-      Offset(x, y - radius * .65),
-      metal,
-    );
-    final body = Rect.fromCenter(
-      center: Offset(x, y),
-      width: radius,
-      height: radius * 1.45,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(body, const Radius.circular(4)),
-      metal,
-    );
-    canvas.drawLine(
-      Offset(body.left + 4, body.top + 3),
-      Offset(body.left + 4, body.bottom - 3),
-      metal,
-    );
-    canvas.drawLine(
-      Offset(body.right - 4, body.top + 3),
-      Offset(body.right - 4, body.bottom - 3),
-      metal,
-    );
-    canvas.drawRect(body.deflate(radius * .18), Paint()..color = _gold);
-    canvas.drawLine(
-      Offset(x - radius * .65, body.top),
-      Offset(x + radius * .65, body.top),
-      metal,
-    );
-    canvas.drawLine(
-      Offset(x - radius * .65, body.bottom),
-      Offset(x + radius * .65, body.bottom),
-      metal,
-    );
-  }
-
-  void _drawPlant(Canvas canvas, double x, double y, double scale) {
-    final leaf = Paint()..color = _navy;
-    canvas.drawLine(
-      Offset(x, y - scale * .2),
-      Offset(x, y - scale),
-      Paint()
-        ..color = _gold
-        ..strokeWidth = 2,
-    );
-    for (var i = 0; i < 5; i++) {
-      final direction = i - 2;
-      final path = Path()
-        ..moveTo(x, y - scale * .34)
-        ..quadraticBezierTo(
-          x + direction * scale * .18,
-          y - scale * .78,
-          x + direction * scale * .28,
-          y - scale * (1.15 - direction.abs() * .1),
-        )
-        ..quadraticBezierTo(
-          x + direction * scale * .09,
-          y - scale * .67,
-          x,
-          y - scale * .34,
-        )
-        ..close();
-      canvas.drawPath(path, leaf);
-    }
-    final pot = Path()
-      ..moveTo(x - scale * .38, y - scale * .22)
-      ..lineTo(x + scale * .38, y - scale * .22)
-      ..lineTo(x + scale * .28, y + scale * .3)
-      ..lineTo(x - scale * .28, y + scale * .3)
-      ..close();
-    canvas.drawPath(pot, Paint()..color = _gold);
-    canvas.drawLine(
-      Offset(x - scale * .38, y - scale * .22),
-      Offset(x + scale * .38, y - scale * .22),
-      Paint()
-        ..color = _navy
-        ..strokeWidth = 3,
-    );
-  }
-
-  void _drawBananaLeaves(Canvas canvas, double x, double y, double scale) {
-    for (var i = 0; i < 5; i++) {
-      final angle = -1.15 + i * .48;
-      final end = Offset(
-        x + math.cos(angle) * scale,
-        y + math.sin(angle) * scale,
-      );
-      final path = Path()
-        ..moveTo(x, y)
-        ..quadraticBezierTo(
-          x + math.cos(angle - .35) * scale * .6,
-          y + math.sin(angle - .35) * scale * .6,
-          end.dx,
-          end.dy,
-        )
-        ..quadraticBezierTo(
-          x + math.cos(angle + .3) * scale * .5,
-          y + math.sin(angle + .3) * scale * .5,
-          x,
-          y,
-        )
-        ..close();
-      canvas.drawPath(path, Paint()..color = i.isEven ? _navy : _gold);
-      canvas.drawLine(
-        Offset(x, y),
-        end,
-        Paint()
-          ..color = _cardCream.withValues(alpha: .6)
-          ..strokeWidth = 1,
-      );
-    }
+    canvas.drawPath(hair, stroke);
   }
 
   @override
-  bool shouldRepaint(covariant _HeritageArchPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ChildFacePainter oldDelegate) =>
+      color != oldDelegate.color;
 }
 
 class _TrustStrip extends StatelessWidget {
   const _TrustStrip();
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+    padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: _cardCream,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _gold.withValues(alpha: .32)),
+        border: Border.all(color: _gold.withValues(alpha: 0.25)),
       ),
-      child: Row(
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           Expanded(
@@ -618,312 +894,28 @@ class _TrustItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Icon(icon, color: _gold, size: 17),
+      Icon(icon, color: _gold, size: 18),
       const SizedBox(height: 3),
-      if (label == 'Rating')
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 4.8),
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 900),
-          builder: (context, count, _) => Text(
-            count.toStringAsFixed(1),
-            maxLines: 1,
-            style: const TextStyle(
-              color: _navy,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        )
-      else
-        Text(
-          value,
-          maxLines: 1,
-          style: const TextStyle(
-            color: _navy,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-          ),
+      Text(
+        value,
+        maxLines: 1,
+        style: const TextStyle(
+          color: _navy,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
         ),
+      ),
       Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: _mainText, fontSize: 9),
+        style: const TextStyle(color: _secondaryText, fontSize: 10),
       ),
     ],
-  );
-}
-
-class BookingCard extends StatelessWidget {
-  const BookingCard({
-    super.key,
-    required this.checkIn,
-    required this.checkOut,
-    required this.adults,
-    required this.children,
-    required this.onCheckInTap,
-    required this.onCheckOutTap,
-    required this.onAdultsChange,
-    required this.onChildrenChange,
-    required this.onSearch,
-  });
-
-  final DateTime checkIn;
-  final DateTime checkOut;
-  final int adults;
-  final int children;
-  final VoidCallback onCheckInTap;
-  final VoidCallback onCheckOutTap;
-  final ValueChanged<int> onAdultsChange;
-  final ValueChanged<int> onChildrenChange;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final compact = constraints.maxWidth < 370;
-      return Container(
-        padding: EdgeInsets.all(compact ? 13 : 16),
-        decoration: BoxDecoration(
-          color: _cardCream,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _gold.withValues(alpha: .35)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A0B1F3A),
-              blurRadius: 22,
-              offset: Offset(0, 9),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _DateChoice(
-                    label: 'Check-in',
-                    date: checkIn,
-                    onTap: onCheckInTap,
-                    compact: compact,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 42,
-                  margin: const EdgeInsets.symmetric(horizontal: 7),
-                  color: _gold.withValues(alpha: .35),
-                ),
-                Expanded(
-                  child: _DateChoice(
-                    label: 'Check-out',
-                    date: checkOut,
-                    onTap: onCheckOutTap,
-                    compact: compact,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: GuestStepper(
-                    label: 'Adults',
-                    count: adults,
-                    icon: Icons.person_outline_rounded,
-                    onChanged: onAdultsChange,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: GuestStepper(
-                    label: 'Children',
-                    count: children,
-                    icon: Icons.child_care_outlined,
-                    onChanged: onChildrenChange,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                onPressed: onSearch,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _navy,
-                  foregroundColor: _cream,
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text(
-                  'Find a stay  →',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-class _DateChoice extends StatelessWidget {
-  const _DateChoice({
-    required this.label,
-    required this.date,
-    required this.onTap,
-    required this.compact,
-  });
-
-  final String label;
-  final DateTime date;
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8, vertical: 8),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.calendar_month_outlined,
-              color: _navy,
-              size: 20,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.secondaryText,
-                      fontSize: 10,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    DateFormat('EEE, d MMM').format(date),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _navy,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class GuestStepper extends StatelessWidget {
-  const GuestStepper({
-    super.key,
-    required this.label,
-    required this.count,
-    required this.icon,
-    required this.onChanged,
-  });
-
-  final String label;
-  final int count;
-  final IconData icon;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, color: _gold, size: 19),
-      const SizedBox(width: 5),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.secondaryText,
-                fontSize: 11,
-              ),
-            ),
-            Text(
-              '$count',
-              style: const TextStyle(
-                color: _navy,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-      _CounterButton(
-        icon: Icons.remove,
-        tooltip: 'Decrease $label',
-        onTap: () => onChanged(-1),
-      ),
-      const SizedBox(width: 4),
-      _CounterButton(
-        icon: Icons.add,
-        tooltip: 'Increase $label',
-        onTap: () => onChanged(1),
-      ),
-    ],
-  );
-}
-
-class _CounterButton extends StatelessWidget {
-  const _CounterButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 32,
-    height: 32,
-    child: IconButton(
-      onPressed: onTap,
-      tooltip: tooltip,
-      padding: EdgeInsets.zero,
-      icon: Icon(icon, size: 16, color: _navy),
-      style: IconButton.styleFrom(
-        backgroundColor: _gold.withValues(alpha: .24),
-        shape: const CircleBorder(),
-        minimumSize: const Size(32, 32),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    ),
   );
 }
 
@@ -954,7 +946,7 @@ class _Section extends StatelessWidget {
                 child: Text(
                   title,
                   style: GoogleFonts.playfairDisplay(
-                    color: _mainText,
+                    color: _navy,
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1004,7 +996,6 @@ class _IconLabel {
 
 class _QuickAccessRow extends StatefulWidget {
   const _QuickAccessRow({required this.onTap});
-
   final ValueChanged<String> onTap;
 
   @override
@@ -1047,13 +1038,13 @@ class _QuickAccessRowState extends State<_QuickAccessRow> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _selected == index ? _navy : _cardCream,
-                    border: Border.all(color: _lightGold, width: 1.2),
+                    border: Border.all(color: _gold, width: 1.2),
                   ),
                   child: Transform.rotate(
                     angle: _selected == index ? -.14 : 0,
                     child: Icon(
                       items[index].icon,
-                      color: _selected == index ? _lightGold : _navy,
+                      color: _selected == index ? _gold : _navy,
                       size: 24,
                     ),
                   ),
@@ -1064,7 +1055,7 @@ class _QuickAccessRowState extends State<_QuickAccessRow> {
                   maxLines: 2,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: _mainText,
+                    color: _navy,
                     fontSize: 10,
                     height: 1.1,
                     fontWeight: FontWeight.w600,
@@ -1081,7 +1072,6 @@ class _QuickAccessRowState extends State<_QuickAccessRow> {
 
 class _ContactCard extends StatelessWidget {
   const _ContactCard({required this.onTap});
-
   final VoidCallback onTap;
 
   @override
@@ -1090,7 +1080,7 @@ class _ContactCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: _navy,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: _lightGold.withValues(alpha: .5)),
+      border: Border.all(color: _gold.withValues(alpha: 0.5)),
     ),
     child: Stack(
       children: [
@@ -1103,7 +1093,7 @@ class _ContactCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: _lightGold.withValues(alpha: .12),
+                color: _gold.withValues(alpha: 0.12),
                 width: 2,
               ),
             ),
@@ -1118,7 +1108,7 @@ class _ContactCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: _lightGold.withValues(alpha: .12),
+                color: _gold.withValues(alpha: 0.12),
                 width: 2,
               ),
             ),
@@ -1127,15 +1117,15 @@ class _ContactCard extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.phone_in_talk_rounded,
-                  color: _lightGold,
+                  color: _gold,
                   size: 24,
                 ),
-                const SizedBox(width: 10),
-                const Expanded(
+                SizedBox(width: 10),
+                Expanded(
                   child: Text(
                     'View property contact details or send a message to the team.',
                     style: TextStyle(
@@ -1153,7 +1143,7 @@ class _ContactCard extends StatelessWidget {
               child: FilledButton(
                 onPressed: onTap,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _lightGold,
+                  backgroundColor: _gold,
                   foregroundColor: _navy,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(13),
@@ -1177,23 +1167,13 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(18, 0, 18, 8),
-    decoration: BoxDecoration(
-      color: _cardCream,
-      borderRadius: BorderRadius.circular(32),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x160F2943),
-          blurRadius: 12,
-          offset: Offset(0, -3),
-        ),
-      ],
-    ),
+    color: _cream,
     child: SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(
               icon: Icons.home_rounded,
@@ -1204,16 +1184,19 @@ class BottomNav extends StatelessWidget {
             _NavItem(
               icon: Icons.bed_outlined,
               label: 'Rooms',
+              selected: false,
               onTap: () => context.go('/rooms'),
             ),
             _NavItem(
-              icon: Icons.event_note_outlined,
+              icon: Icons.calendar_month_outlined,
               label: 'Bookings',
+              selected: false,
               onTap: () => context.go('/bookings'),
             ),
             _NavItem(
               icon: Icons.person_outline_rounded,
               label: 'Profile',
+              selected: false,
               onTap: () => context.go('/profile'),
             ),
           ],
@@ -1237,40 +1220,39 @@ class _NavItem extends StatelessWidget {
   final bool selected;
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: _navy,
+            size: 25,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
               color: _navy,
-              size: 21,
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: _navy,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 22,
+            height: 2.5,
+            decoration: BoxDecoration(
+              color: selected ? _gold : Colors.transparent,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 3),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: selected ? 20 : 0,
-              height: 2,
-              decoration: BoxDecoration(
-                color: selected ? _gold : Colors.transparent,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -1303,11 +1285,11 @@ class AtithiDestinationScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: _cardCream,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _lightGold.withValues(alpha: .6)),
+            border: Border.all(color: _gold.withValues(alpha: 0.6)),
           ),
           child: Text(
             description,
-            style: const TextStyle(color: _mainText, fontSize: 16, height: 1.6),
+            style: const TextStyle(color: _navy, fontSize: 16, height: 1.6),
           ),
         ),
       ),
