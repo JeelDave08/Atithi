@@ -180,20 +180,30 @@ class _MobileNavigation extends StatelessWidget {
   const _MobileNavigation({required this.activeRoute});
   final String activeRoute;
 
-  static const _items = <(String, String, IconData)>[
-    ('Home', '/home', Icons.home_outlined),
-    ('Rooms', '/rooms', Icons.bed_outlined),
-    ('Bookings', '/bookings', Icons.calendar_month_outlined),
-    ('Profile', '/profile', Icons.person_outline_rounded),
+  static const _items = <(String, String, IconData, IconData)>[
+    ('Home', '/home', Icons.home_rounded, Icons.home_outlined),
+    ('Rooms', '/rooms', Icons.bed_rounded, Icons.bed_outlined),
+    ('Bookings', '/bookings', Icons.calendar_month_rounded, Icons.calendar_month_outlined),
+    ('Profile', '/profile', Icons.person_rounded, Icons.person_outline_rounded),
   ];
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.surface,
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFFDF9),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: .07),
+          blurRadius: 18,
+          offset: const Offset(0, -3),
+        ),
+      ],
+    ),
     child: SafeArea(
       top: false,
       child: SizedBox(
-        height: 66,
+        height: 68,
         child: Row(
           children: [
             for (final item in _items)
@@ -204,21 +214,40 @@ class _MobileNavigation extends StatelessWidget {
                   label: item.$1,
                   child: InkWell(
                     onTap: () => context.go(item.$2),
+                    borderRadius: BorderRadius.circular(20),
                     child: SizedBox(
-                      height: 52,
+                      height: 56,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(item.$3, size: 22, color: AppColors.navy),
-                          const SizedBox(height: 2),
+                          Icon(
+                            activeRoute == item.$2 ? item.$3 : item.$4,
+                            size: 23,
+                            color: activeRoute == item.$2
+                                ? AppColors.navy
+                                : AppColors.navy.withValues(alpha: .60),
+                          ),
+                          const SizedBox(height: 3),
                           Text(
                             item.$1,
                             style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.navy,
+                              fontSize: 11.5,
+                              color: activeRoute == item.$2
+                                  ? AppColors.navy
+                                  : AppColors.navy.withValues(alpha: .65),
                               fontWeight: activeRoute == item.$2
                                   ? FontWeight.w700
                                   : FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: activeRoute == item.$2 ? 22 : 0,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC59B3F),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ],

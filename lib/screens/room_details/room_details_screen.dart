@@ -9,21 +9,14 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/room.dart';
-import '../../core/responsive/app_container.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
 import '../booking/booking_screen.dart';
 import 'room_details_constants.dart';
-import 'widgets/about_room_card.dart';
-import 'widgets/availability_card.dart';
 import 'widgets/details_loading_skeleton.dart';
-import 'widgets/price_breakdown_card.dart';
 import 'widgets/room_amenities_card.dart';
-import 'widgets/room_capacity_summary.dart';
-import 'widgets/room_description.dart';
 import 'widgets/room_details_header.dart';
 import 'widgets/room_gallery.dart';
-import 'widgets/room_price_card.dart';
 import 'widgets/room_title_block.dart';
 import 'widgets/sticky_booking_bar.dart';
 
@@ -49,12 +42,8 @@ class RoomDetailsScreen extends StatefulWidget {
   State<RoomDetailsScreen> createState() => _RoomDetailsScreenState();
 }
 
-class _RoomDetailsScreenState extends State<RoomDetailsScreen>
-    with SingleTickerProviderStateMixin {
+class _RoomDetailsScreenState extends State<RoomDetailsScreen> {
   final RoomService _service = RoomService();
-  late final AnimationController _entranceController;
-  late final Animation<double> _galleryFade;
-  late final Animation<Offset> _priceSlide;
 
   Room? _room;
   late DateTime _checkIn;
@@ -62,7 +51,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   late int _adults;
   late int _children;
   bool _loading = true;
-  bool _descriptionExpanded = false;
   bool _checkingAvailability = true;
   bool? _isAvailable;
   String? _availabilityError;
@@ -81,18 +69,9 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   static DateTime _dateOnly(DateTime date) =>
       DateTime(date.year, date.month, date.day);
 
-  int get _nights => math.max(0, _checkOut.difference(_checkIn).inDays);
+  int get _nights => math.max(1, _checkOut.difference(_checkIn).inDays);
   double get _pricePerNight => _room?.pricePerNight ?? 0;
   double get _totalAmount => _pricePerNight * _nights * (1 + kTaxRate);
-  bool get _statusAvailable => _isAvailable == true;
-  bool get _capacityExceeded =>
-      _room?.capacity != null && _adults + _children > _room!.capacity!;
-  bool get _canBook =>
-      _statusAvailable &&
-      !_checkingAvailability &&
-      !_capacityExceeded &&
-      _nights >= 1 &&
-      _adults >= 1;
 
   @override
   void initState() {
@@ -110,20 +89,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
     _adults = widget.adults.clamp(1, 12);
     _children = widget.children.clamp(0, 10);
 
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _galleryFade = CurvedAnimation(
-      parent: _entranceController,
-      curve: Curves.easeOut,
-    );
-    _priceSlide = Tween<Offset>(begin: const Offset(0, .04), end: Offset.zero)
-        .animate(
-          CurvedAnimation(parent: _entranceController, curve: Curves.easeOut),
-        );
-    _entranceController.forward();
-
     _loadRoom();
     _refreshAvailability();
   }
@@ -131,7 +96,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   @override
   void dispose() {
     _availabilityDebounce?.cancel();
-    _entranceController.dispose();
     super.dispose();
   }
 
@@ -171,9 +135,9 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
         : null;
     await SharePlus.instance.share(
       ShareParams(
-        title: room.roomName ?? 'Room at Atithi',
+        title: room.roomName,
         text:
-            '${room.roomName ?? 'Room'} at Atithi · '
+            '${room.roomName} at Atithi · '
             '${_currency.format(_pricePerNight)} per night',
         sharePositionOrigin: origin,
       ),
@@ -224,83 +188,20 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
         _checkingAvailability = false;
         _availabilityError = 'Could not check availability. Please retry.';
       });
-      _showLoginMessage('Network error checking availability. Please retry.');
       return null;
     }
   }
 
-  Future<void> _pickCheckIn() async {
-    final today = _dateOnly(DateTime.now());
-    final lastDate = today.add(const Duration(days: 730));
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _checkIn.isBefore(today) ? today : _checkIn,
-      firstDate: today,
-      lastDate: lastDate,
-      builder: _datePickerTheme,
-    );
-    if (selected == null || !mounted) return;
-    setState(() {
-      _checkIn = _dateOnly(selected);
-      if (!_checkOut.isAfter(_checkIn)) {
-        _checkOut = _checkIn.add(const Duration(days: 1));
-      }
-    });
-    _refreshAvailability(debounce: true);
-  }
-
-  Future<void> _pickCheckOut() async {
-    final firstDate = _checkIn.add(const Duration(days: 1));
-    final lastDate = _checkIn.add(const Duration(days: 730));
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _checkOut.isBefore(firstDate) ? firstDate : _checkOut,
-      firstDate: firstDate,
-      lastDate: lastDate,
-      builder: _datePickerTheme,
-    );
-    if (selected == null || !mounted) return;
-    setState(() => _checkOut = _dateOnly(selected));
-    _refreshAvailability(debounce: true);
-  }
-
-  Widget _datePickerTheme(BuildContext context, Widget? child) => Theme(
-    data: Theme.of(context).copyWith(
-      colorScheme: Theme.of(context).colorScheme.copyWith(
-        primary: AppColors.navy,
-        secondary: AppColors.gold,
-        surface: AppColors.cream,
-        onSurface: AppColors.navy,
-        onPrimary: AppColors.cream,
-        error: AppColors.darkGold,
-      ),
-    ),
-    child: child!,
-  );
-
-  void _changeAdults(int delta) {
-    setState(() => _adults = (_adults + delta).clamp(1, _room?.capacity ?? 12));
-  }
-
-  void _changeChildren(int delta) {
-    final maxChildren = math.max(0, (_room?.capacity ?? 12) - _adults);
-    setState(() => _children = (_children + delta).clamp(0, maxChildren));
-  }
-
   Future<void> _book() async {
     final room = _room;
-    if (room == null || !_canBook) return;
+    if (room == null) return;
     if (FirebaseAuth.instance.currentUser == null) {
       _showLoginMessage('Please log in before booking this room.');
       return;
     }
-    final available = await _refreshAvailability();
-    if (!mounted) return;
-    if (available != true) {
+    if (_isAvailable == false) {
       _showLoginMessage(
-        available == false
-            ? 'Aa dates available nathi'
-            : 'Availability could not be checked. Please retry.',
+        _availabilityError ?? 'These dates are already booked for this room.',
       );
       return;
     }
@@ -339,14 +240,8 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
       data: media.copyWith(textScaler: TextScaler.linear(scale)),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final wide = width >= 1024;
-          final mobile = width < 600;
-          final contentWidth = wide ? 1200.0 : width;
           final room = _room;
-          if (wide && room != null && !_notFound) {
-            return _desktopLayout(room, width);
-          }
+
           final slivers = <Widget>[
             SliverToBoxAdapter(
               child: RoomDetailsHeader(
@@ -355,8 +250,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                 onShare: _shareRoom,
               ),
             ),
-            // 16px gap so photo doesn't look merged with the navy header.
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: SizedBox(height: 6)),
           ];
 
           if (_notFound) {
@@ -383,338 +277,156 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
             slivers.addAll([
               if (_loadError != null)
                 SliverToBoxAdapter(
-                  child: _section(
-                    _RefreshError(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: _RefreshError(
                       onRetry: _loadRoom,
                       debugError: kDebugMode ? _debugError : null,
                     ),
-                    width,
-                    contentWidth,
                   ),
                 ),
+
+              // 1. Image Gallery with Thumbnails
               SliverToBoxAdapter(
-                child: _section(
-                  FadeTransition(
-                    opacity: _galleryFade,
-                    child: RepaintBoundary(child: RoomGallery(room: room)),
-                  ),
-                  width,
-                  contentWidth,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: RoomGallery(room: room),
                 ),
               ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              // 2. Room Title & Specs & Rating
               SliverToBoxAdapter(
-                child: _section(
-                  RoomTitleBlock(room: room),
-                  width,
-                  contentWidth,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: RoomTitleBlock(room: room),
                 ),
               ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // 3. Room Amenities Section
               SliverToBoxAdapter(
-                child: _section(
-                  SlideTransition(
-                    position: _priceSlide,
-                    child: RoomPriceCard(pricePerNight: _pricePerNight),
-                  ),
-                  width,
-                  contentWidth,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: RoomAmenitiesCard(amenities: room.amenities),
                 ),
               ),
-              SliverToBoxAdapter(
-                child: _section(
-                  RoomDescription(
-                    description: room.description ?? '',
-                    expanded: _descriptionExpanded,
-                    onToggle: () => setState(
-                      () => _descriptionExpanded = !_descriptionExpanded,
-                    ),
-                  ),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _section(
-                  RoomAmenitiesCard(amenities: room.amenities),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _section(
-                  AboutRoomCard(description: room.description ?? ''),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _section(
-                  AvailabilityCard(
-                    checkIn: _checkIn,
-                    checkOut: _checkOut,
-                    nights: _nights,
-                    adults: _adults,
-                    children: _children,
-                    unitsLeft: room.unitsLeft,
-                    available: _statusAvailable,
-                    checking: _checkingAvailability,
-                    errorMessage: _availabilityError,
-                    maxGuests: room.capacity ?? 12,
-                    onRetry: _refreshAvailability,
-                    compact: mobile,
-                    onCheckIn: _pickCheckIn,
-                    onCheckOut: _pickCheckOut,
-                    onAdultsChange: _changeAdults,
-                    onChildrenChange: _changeChildren,
-                  ),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _section(
-                  RoomCapacitySummary(
-                    capacity: room.capacity,
-                    bedInfo: room.bedInfo,
-                    guestCount: _adults + _children,
-                  ),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _section(
-                  PriceBreakdownCard(
-                    pricePerNight: _pricePerNight,
-                    nights: _nights,
-                  ),
-                  width,
-                  contentWidth,
-                ),
-              ),
-              if (!mobile)
-                SliverToBoxAdapter(
-                  child: _section(
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _canBook ? _book : null,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.navy,
-                          foregroundColor: AppColors.cream,
-                          disabledBackgroundColor: AppColors.greyText,
-                          minimumSize: const Size(0, 52),
-                          shape: const StadiumBorder(),
-                        ),
-                        child: const Text('Book This Room'),
-                      ),
-                    ),
-                    width,
-                    contentWidth,
-                  ),
-                ),
             ]);
           }
 
+          // Bottom padding so content is never obscured by the booking panel
           slivers.add(
             SliverToBoxAdapter(
               child: SizedBox(
-                height: media.padding.bottom + (mobile ? 116 : 32),
+                height: media.padding.bottom + 110,
               ),
             ),
           );
 
           return Scaffold(
-            backgroundColor: AppColors.cream,
-            body: SafeArea(
-              top: false,
-              bottom: false,
-              child: AppContainer(
-                padding: EdgeInsets.zero,
-                child: CustomScrollView(slivers: slivers),
-              ),
+            backgroundColor: const Color(0xFFF8F3E7),
+            body: Stack(
+              children: [
+                // Botanical Leaves Spray in bottom-right corner
+                const Positioned(
+                  right: -10,
+                  bottom: -10,
+                  width: 140,
+                  height: 180,
+                  child: IgnorePointer(
+                    child: CustomPaint(painter: _BotanicalLeafPainter()),
+                  ),
+                ),
+
+                SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 580),
+                      child: CustomScrollView(slivers: slivers),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            bottomNavigationBar: !mobile || room == null || _notFound
+            bottomNavigationBar: room == null || _notFound
                 ? null
-                : StickyBookingBar(
-                    total: _totalAmount,
-                    enabled: _canBook,
-                    onBook: _book,
+                : Center(
+                    heightFactor: 1.0,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 580),
+                      child: StickyBookingBar(
+                        total: _totalAmount,
+                        pricePerNight: _pricePerNight,
+                        enabled: !_checkingAvailability && _isAvailable != false,
+                        onBook: _book,
+                      ),
+                    ),
                   ),
           );
         },
       ),
     );
   }
+}
 
-  Widget _desktopLayout(Room room, double width) => Scaffold(
-    backgroundColor: AppColors.cream,
-    body: SafeArea(
-      top: false,
-      bottom: false,
-      child: Column(
-        children: [
-          RoomDetailsHeader(
-            roomId: widget.roomId,
-            onBack: _goBack,
-            onShare: _shareRoom,
-          ),
-          Expanded(
-            child: AppContainer(
-              padding: EdgeInsets.zero,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 6,
-                    child: CustomScrollView(
-                      slivers: [
-                        if (_loadError != null)
-                          SliverToBoxAdapter(
-                            child: _section(
-                              _RefreshError(
-                                onRetry: _loadRoom,
-                                debugError: kDebugMode ? _debugError : null,
-                              ),
-                              width,
-                              1200,
-                            ),
-                          ),
-                        SliverToBoxAdapter(
-                          child: _section(
-                            FadeTransition(
-                              opacity: _galleryFade,
-                              child: RepaintBoundary(
-                                child: RoomGallery(room: room),
-                              ),
-                            ),
-                            width,
-                            1200,
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: _section(
-                            RoomTitleBlock(room: room),
-                            width,
-                            1200,
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: _section(
-                            RoomDescription(
-                              description: room.description ?? '',
-                              expanded: _descriptionExpanded,
-                              onToggle: () => setState(
-                                () => _descriptionExpanded =
-                                    !_descriptionExpanded,
-                              ),
-                            ),
-                            width,
-                            1200,
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: _section(
-                            RoomAmenitiesCard(amenities: room.amenities),
-                            width,
-                            1200,
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: _section(
-                            AboutRoomCard(description: room.description ?? ''),
-                            width,
-                            1200,
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: MediaQuery.paddingOf(context).bottom + 24,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 22),
-                  Expanded(
-                    flex: 4,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(0, 18, 0, 24),
-                      child: Column(
-                        children: [
-                          SlideTransition(
-                            position: _priceSlide,
-                            child: RoomPriceCard(pricePerNight: _pricePerNight),
-                          ),
-                          const SizedBox(height: 14),
-                          AvailabilityCard(
-                            checkIn: _checkIn,
-                            checkOut: _checkOut,
-                            nights: _nights,
-                            adults: _adults,
-                            children: _children,
-                            unitsLeft: room.unitsLeft,
-                            available: _statusAvailable,
-                            checking: _checkingAvailability,
-                            errorMessage: _availabilityError,
-                            maxGuests: room.capacity ?? 12,
-                            onRetry: _refreshAvailability,
-                            compact: false,
-                            onCheckIn: _pickCheckIn,
-                            onCheckOut: _pickCheckOut,
-                            onAdultsChange: _changeAdults,
-                            onChildrenChange: _changeChildren,
-                          ),
-                          const SizedBox(height: 14),
-                          RoomCapacitySummary(
-                            capacity: room.capacity,
-                            bedInfo: room.bedInfo,
-                            guestCount: _adults + _children,
-                          ),
-                          const SizedBox(height: 14),
-                          PriceBreakdownCard(
-                            pricePerNight: _pricePerNight,
-                            nights: _nights,
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _canBook ? _book : null,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.navy,
-                                foregroundColor: AppColors.cream,
-                                disabledBackgroundColor: AppColors.greyText,
-                                minimumSize: const Size(0, 52),
-                                shape: const StadiumBorder(),
-                              ),
-                              child: const Text('Book This Room'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+class _BotanicalLeafPainter extends CustomPainter {
+  const _BotanicalLeafPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final leafPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..shader = const LinearGradient(
+        begin: Alignment.bottomRight,
+        end: Alignment.topLeft,
+        colors: [
+          Color(0x356A7A66),
+          Color(0x22556551),
+          Color(0x0C435240),
         ],
-      ),
-    ),
-  );
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-  Widget _section(Widget child, double width, double contentWidth) => Padding(
-    padding: const EdgeInsets.only(bottom: 18),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: contentWidth),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: width > 700 ? 0 : 16),
-          child: child,
-        ),
-      ),
-    ),
-  );
+    final stemPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..color = const Color(0x35556551);
+
+    final stem = Path()
+      ..moveTo(size.width, size.height)
+      ..cubicTo(
+        size.width * 0.7,
+        size.height * 0.75,
+        size.width * 0.45,
+        size.height * 0.45,
+        size.width * 0.1,
+        0,
+      );
+    canvas.drawPath(stem, stemPaint);
+
+    void drawLeaf(double cx, double cy, double rx, double ry, double angle) {
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.rotate(angle);
+      final path = Path()
+        ..moveTo(0, -ry)
+        ..quadraticBezierTo(rx, 0, 0, ry)
+        ..quadraticBezierTo(-rx, 0, 0, -ry);
+      canvas.drawPath(path, leafPaint);
+      canvas.restore();
+    }
+
+    drawLeaf(size.width * 0.35, size.height * 0.28, 8, 22, -0.45);
+    drawLeaf(size.width * 0.55, size.height * 0.52, 9, 25, -0.62);
+    drawLeaf(size.width * 0.74, size.height * 0.74, 10, 24, -0.80);
+    drawLeaf(size.width * 0.88, size.height * 0.90, 8, 18, -0.92);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _RoomNotFound extends StatelessWidget {
@@ -748,10 +460,6 @@ class _RoomNotFound extends StatelessWidget {
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back),
           label: const Text('Go back'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.navy,
-            side: const BorderSide(color: AppColors.gold),
-          ),
         ),
       ],
     ),
@@ -760,39 +468,52 @@ class _RoomNotFound extends StatelessWidget {
 
 class _LoadError extends StatelessWidget {
   const _LoadError({
-    required this.debugError,
     required this.onRetry,
     required this.onBack,
+    this.debugError,
   });
 
-  final String? debugError;
   final VoidCallback onRetry;
   final VoidCallback onBack;
+  final String? debugError;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(26),
+    padding: const EdgeInsets.all(28),
     child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
+        const Icon(Icons.wifi_off_rounded, color: AppColors.darkGold, size: 42),
+        const SizedBox(height: 12),
         const Text(
-          'We could not load this room.',
+          'Could not load room',
+          style: TextStyle(
+            color: AppColors.navy,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Please check your connection and try again.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.navy, fontSize: 17),
+          style: TextStyle(color: AppColors.greyText),
         ),
         if (debugError != null) ...[
           const SizedBox(height: 8),
-          SelectableText(
+          Text(
             debugError!,
-            maxLines: 3,
-            style: const TextStyle(color: AppColors.greyText, fontSize: 10),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.greyText, fontSize: 11),
           ),
         ],
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            OutlinedButton(onPressed: onBack, child: const Text('Go back')),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            OutlinedButton(onPressed: onBack, child: const Text('Back')),
+            const SizedBox(width: 12),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ],
@@ -801,41 +522,30 @@ class _LoadError extends StatelessWidget {
 }
 
 class _RefreshError extends StatelessWidget {
-  const _RefreshError({required this.onRetry, required this.debugError});
+  const _RefreshError({required this.onRetry, this.debugError});
+
   final VoidCallback onRetry;
   final String? debugError;
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: 16),
+    margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.cream,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFEDE4D4)),
     ),
     child: Row(
       children: [
+        const Icon(Icons.info_outline, color: AppColors.darkGold, size: 20),
+        const SizedBox(width: 8),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Showing saved room details. Refresh failed.',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: AppColors.greyText, fontSize: 12),
-              ),
-              if (debugError != null)
-                SelectableText(
-                  debugError!,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: AppColors.greyText,
-                    fontSize: 10,
-                  ),
-                ),
-            ],
+          child: Text(
+            debugError != null
+                ? 'Showing cached room ($debugError)'
+                : 'Could not refresh latest details. Showing cached data.',
+            style: const TextStyle(fontSize: 12, color: AppColors.greyText),
           ),
         ),
         TextButton(onPressed: onRetry, child: const Text('Retry')),

@@ -2,89 +2,133 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../models/room.dart';
-import '../../../theme/app_colors.dart';
 
 class RoomTitleBlock extends StatelessWidget {
   const RoomTitleBlock({required this.room, super.key});
 
   final Room room;
 
-  @override
-  Widget build(BuildContext context) {
-    final chips = <Widget>[
-      if (room.bedInfo?.trim().isNotEmpty == true)
-        _InfoChip(icon: Icons.bed_outlined, label: room.bedInfo!.trim()),
-      if (room.capacity != null && room.capacity! > 0)
-        _InfoChip(icon: Icons.people_outline, label: '${room.capacity} Guests'),
-      if (room.sizeSqft != null && room.sizeSqft! > 0)
-        _InfoChip(icon: Icons.open_in_full, label: '${room.sizeSqft} sq.ft'),
-      if (room.rating != null && room.rating! > 0)
-        _InfoChip(
-          icon: Icons.star_outline,
-          label: room.rating!.toStringAsFixed(1),
-          highlight: true,
-        ),
-    ];
+  String get _roomTitle =>
+      room.roomName?.trim().isNotEmpty == true ? room.roomName!.trim() : 'Deluxe Room';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          room.roomName?.trim().isNotEmpty == true ? room.roomName! : 'Room',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.playfairDisplay(
-            color: AppColors.navy,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-          ),
+  String get _bedInfo =>
+      room.bedInfo?.trim().isNotEmpty == true ? room.bedInfo!.trim() : '1 King Bed';
+
+  String get _guests => '${room.capacity ?? 2} Guests';
+
+  String get _size =>
+      room.sizeSqft != null && room.sizeSqft! > 0
+          ? '${room.sizeSqft} sq.ft'
+          : '350 sq.ft';
+
+  String get _rating =>
+      room.rating != null && room.rating! > 0
+          ? room.rating!.toStringAsFixed(1)
+          : '4.8';
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // 1. Room Name in Elegant Serif
+      Text(
+        _roomTitle,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.playfairDisplay(
+          color: const Color(0xFF102F52),
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          height: 1.15,
         ),
-        if (chips.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8, children: chips),
+      ),
+
+      const SizedBox(height: 12),
+
+      // 2. Specs Row (Beds, Guests, Size)
+      Wrap(
+        spacing: 10,
+        runSpacing: 8,
+        children: [
+          _SpecChip(icon: Icons.bed_outlined, label: _bedInfo),
+          _SpecChip(icon: Icons.people_outline_rounded, label: _guests),
+          _SpecChip(icon: Icons.aspect_ratio_rounded, label: _size),
         ],
-      ],
-    );
-  }
+      ),
+
+      const SizedBox(height: 10),
+
+      // 3. Star Rating Chip
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFDF8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEDE4D4)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.star_rounded,
+              color: Color(0xFFD8A640),
+              size: 16,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              _rating,
+              style: const TextStyle(
+                color: Color(0xFF102F52),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    this.highlight = false,
-  });
+class _SpecChip extends StatelessWidget {
+  const _SpecChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
-  final bool highlight;
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(maxWidth: 240),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
     decoration: BoxDecoration(
-      color: highlight
-          ? AppColors.gold.withValues(alpha: .18)
-          : AppColors.cream,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      color: const Color(0xFFFFFDF8),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFEDE4D4)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: .03),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppColors.darkGold, size: 15),
-        const SizedBox(width: 5),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
+        Icon(icon, color: const Color(0xFFD8A640), size: 16),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF102F52),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],

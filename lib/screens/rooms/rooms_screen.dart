@@ -197,6 +197,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         },
         child: AppShell(
           activeRoute: '/rooms',
+          backgroundColor: const Color(0xFFFBF8F2),
           body: SafeArea(
             top: false,
             bottom: false,
@@ -232,21 +233,27 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       ),
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
+                          padding: EdgeInsets.fromLTRB(
+                            maxWidth > 700 ? 24 : 18,
+                            14,
+                            maxWidth > 700 ? 24 : 18,
+                            0,
+                          ),
                           child: RoomSearchBar(
                             controller: _searchController,
                             onChanged: _onSearchChanged,
                             onClear: _clearSearch,
+                            onFilters: _openFilters,
                           ),
                         ),
                       ),
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: EdgeInsets.fromLTRB(
-                            maxWidth > 700 ? 24 : 14,
-                            12,
-                            maxWidth > 700 ? 24 : 14,
-                            12,
+                            maxWidth > 700 ? 24 : 18,
+                            16,
+                            maxWidth > 700 ? 24 : 18,
+                            16,
                           ),
                           child: RoomFilterBar(
                             isActive: _filters.isActive,
@@ -360,29 +367,45 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       constraints: BoxConstraints(maxWidth: contentWidth),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          maxWidth > 700 ? 24 : 16,
+          maxWidth > 700 ? 24 : 18,
           0,
-          maxWidth > 700 ? 24 : 16,
-          15,
+          maxWidth > 700 ? 24 : 18,
+          16,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.bed_outlined, color: AppColors.darkGold, size: 18),
-            const SizedBox(width: 7),
+            const Icon(
+              Icons.bed_rounded,
+              color: Color(0xFFC59B3F),
+              size: 22,
+            ),
+            const SizedBox(width: 9),
+            Text(
+              ref.watch(staySearchProvider)?.isActive == true
+                  ? '${_filteredRooms.length} Rooms for ${ref.watch(staySearchProvider)!.totalGuests} guests'
+                  : _filters.isActive || searchQuery.isNotEmpty
+                  ? '${_filteredRooms.length} Rooms found'
+                  : '${_filteredRooms.length} Rooms Available',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.dmSans(
+                color: AppColors.navy,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                ref.watch(staySearchProvider)?.isActive == true
-                    ? '${_filteredRooms.length} Rooms for ${ref.watch(staySearchProvider)!.totalGuests} guests'
-                    : _filters.isActive || searchQuery.isNotEmpty
-                    ? '${_filteredRooms.length} Rooms found'
-                    : '${_filteredRooms.length} Rooms Available',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+              child: Container(
+                height: 2.2,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFC59B3F),
+                      Color(0x00C59B3F),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),

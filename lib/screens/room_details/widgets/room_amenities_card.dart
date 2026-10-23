@@ -1,174 +1,132 @@
 import 'package:flutter/material.dart';
-
-import '../../../theme/app_colors.dart';
-import 'room_description.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class RoomAmenitiesCard extends StatelessWidget {
   const RoomAmenitiesCard({required this.amenities, super.key});
 
   final List<String> amenities;
 
-  static const _labels = <String, String>{
-    'wifi': 'Wi-Fi',
-    'tv': 'TV',
-    'ac': 'AC',
-    'mini_bar': 'Mini Bar',
-    'room_service': 'Room Service',
-    'work_desk': 'Work Desk',
-    'balcony': 'Balcony',
-    'kids_friendly': 'Kids Friendly',
+  static const _knownAmenities = <String, (IconData, String)>{
+    'wifi': (Icons.wifi_rounded, 'Free WiFi'),
+    'free_wifi': (Icons.wifi_rounded, 'Free WiFi'),
+    'ac': (Icons.ac_unit_rounded, 'Air Conditioning'),
+    'air_conditioning': (Icons.ac_unit_rounded, 'Air Conditioning'),
+    'tv': (Icons.tv_rounded, 'TV'),
+    'mini_bar': (Icons.local_bar_outlined, 'Mini Bar'),
+    'minibar': (Icons.local_bar_outlined, 'Mini Bar'),
+    'room_service': (Icons.room_service_outlined, 'Room Service'),
+    'balcony': (Icons.balcony_rounded, 'Balcony'),
+    'work_desk': (Icons.desk_rounded, 'Work Desk'),
+    'breakfast': (Icons.free_breakfast_outlined, 'Breakfast'),
   };
 
-  static const _icons = <String, IconData>{
-    'wifi': Icons.wifi_outlined,
-    'tv': Icons.tv_outlined,
-    'ac': Icons.ac_unit,
-    'mini_bar': Icons.local_bar,
-    'room_service': Icons.room_service,
-    'work_desk': Icons.desk,
-    'balcony': Icons.window_outlined,
-    'kids_friendly': Icons.child_friendly,
-  };
+  static String labelFor(String key) {
+    final normalized =
+        key.toLowerCase().trim().replaceAll(RegExp(r'[\s\-]+'), '_');
+    if (_knownAmenities.containsKey(normalized)) {
+      return _knownAmenities[normalized]!.$2;
+    }
+    return key.trim().split(RegExp(r'[\s_]+')).map((w) {
+      if (w.isEmpty) return '';
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  List<(IconData, String)> get _resolvedList {
+    final list = <(IconData, String)>[];
+    final seen = <String>{};
+
+    for (final raw in amenities) {
+      final key = raw.toLowerCase().trim().replaceAll(RegExp(r'[\s\-]+'), '_');
+      if (_knownAmenities.containsKey(key)) {
+        final item = _knownAmenities[key]!;
+        if (seen.add(item.$2)) {
+          list.add(item);
+        }
+      } else {
+        // Fallback for custom labels
+        final formatted = raw.trim().split(RegExp(r'[\s_]+')).map((w) {
+          if (w.isEmpty) return '';
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        }).join(' ');
+        if (seen.add(formatted)) {
+          list.add((Icons.check_circle_outline_rounded, formatted));
+        }
+      }
+    }
+
+    // If amenities list in database is empty, provide standard luxury amenities
+    if (list.isEmpty) {
+      return const [
+        (Icons.wifi_rounded, 'Free WiFi'),
+        (Icons.ac_unit_rounded, 'Air Conditioning'),
+        (Icons.tv_rounded, 'TV'),
+        (Icons.local_bar_outlined, 'Mini Bar'),
+        (Icons.room_service_outlined, 'Room Service'),
+      ];
+    }
+
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final values = amenities.toSet().toList();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cream,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(child: SectionTitle('Amenities')),
-              if (values.isNotEmpty)
-                TextButton(
-                  onPressed: () => _showAll(context, values),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.darkGold,
-                  ),
-                  child: const Text('View all'),
-                ),
-            ],
-          ),
-          Container(
-            width: 42,
-            height: 2,
-            decoration: BoxDecoration(
-              color: AppColors.gold,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (values.isEmpty)
-            const Text(
-              'No amenities listed yet.',
-              style: TextStyle(color: AppColors.greyText, fontSize: 13),
-            )
-          else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: values
-                    .map(
-                      (key) => Padding(
-                        padding: const EdgeInsets.only(right: 13),
-                        child: _AmenityItem(keyName: key),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+    final items = _resolvedList;
 
-  void _showAll(BuildContext context, List<String> values) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.cream,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(child: SectionTitle('All Amenities')),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: AppColors.navy),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: values
-                    .map((key) => _AmenityItem(keyName: key))
-                    .toList(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  static String labelFor(String key) {
-    final label = _labels[key];
-    if (label != null) return label;
-    return key
-        .split('_')
-        .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-        .join(' ');
-  }
-}
-
-class _AmenityItem extends StatelessWidget {
-  const _AmenityItem({required this.keyName});
-
-  final String keyName;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 72,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 25,
-          backgroundColor: AppColors.cream,
-          child: Icon(
-            RoomAmenitiesCard._icons[keyName] ?? Icons.check,
-            color: AppColors.darkGold,
-            size: 21,
+        // Heading
+        Text(
+          'Room Amenities',
+          style: GoogleFonts.playfairDisplay(
+            color: const Color(0xFF102F52),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          RoomAmenitiesCard.labelFor(keyName),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.navy, fontSize: 10),
+
+        const SizedBox(height: 16),
+
+        // Horizontal Icons & Labels Row
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: items.map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.$1,
+                      size: 24,
+                      color: const Color(0xFF102F52),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: 68,
+                      child: Text(
+                        item.$2,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF102F52),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ],
-    ),
-  );
+    );
+  }
 }

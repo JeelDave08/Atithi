@@ -16,60 +16,115 @@ class RoomDetailsHeader extends StatelessWidget {
   final VoidCallback onShare;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
-    child: ColoredBox(
-      color: AppColors.navy,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Row(
-            children: [
-              _CircleButton(icon: Icons.arrow_back, onPressed: onBack),
-              const Spacer(),
-              Container(
-                width: 46,
-                height: 46,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.cream,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Image.asset(
-                  'assets/images/atithi_mark.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const Spacer(),
-              WishlistButton(roomId: roomId, size: 40, onDarkBackground: true),
-              const SizedBox(width: 8),
-              _CircleButton(icon: Icons.share_outlined, onPressed: onShare),
-            ],
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+      child: Row(
+        children: [
+          // 1. Back Button
+          _CircleButton(
+            icon: Icons.chevron_left_rounded,
+            iconSize: 26,
+            onPressed: onBack,
           ),
-        ),
+
+          const Spacer(),
+
+          // 2. Centered Atithi Logo Mark
+          Container(
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: const Color(0xFFEFE8DB),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Image.asset(
+              'assets/images/atithi_mark.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+
+          const Spacer(),
+
+          // 3. Favourite Heart Button
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: WishlistButton(
+              roomId: roomId,
+              size: 40,
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // 4. Share Button
+          _CircleButton(
+            icon: Icons.share_outlined,
+            iconSize: 19,
+            onPressed: onShare,
+          ),
+        ],
       ),
     ),
   );
 }
 
 class _CircleButton extends StatelessWidget {
-  const _CircleButton({required this.icon, required this.onPressed});
+  const _CircleButton({
+    required this.icon,
+    required this.onPressed,
+    this.iconSize = 20,
+  });
 
   final IconData icon;
+  final double iconSize;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: AppColors.cream.withValues(alpha: .12),
+    color: Colors.white,
     shape: const CircleBorder(),
+    elevation: 1,
+    shadowColor: const Color(0x18000000),
     child: InkWell(
       customBorder: const CircleBorder(),
       onTap: onPressed,
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: Icon(icon, color: AppColors.gold, size: 20),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFEFE8DB), width: 1),
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            color: AppColors.navy,
+            size: iconSize,
+          ),
+        ),
       ),
     ),
   );
