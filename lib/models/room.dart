@@ -31,6 +31,7 @@ class Room {
   final String? description;
   final double? pricePerNight;
   final int? capacity;
+  int get maxGuests => capacity ?? 2;
   final List<String> amenities;
   final List<String> imageUrls;
   final String? status;
@@ -51,7 +52,7 @@ class Room {
     roomType: json['room_type']?.toString(),
     description: json['description']?.toString(),
     pricePerNight: _toDouble(json['price_per_night']),
-    capacity: _toInt(json['capacity']),
+    capacity: _toInt(json['guests']) ?? _toInt(json['capacity']) ?? 2,
     amenities: _stringList(json['amenities']),
     imageUrls: _stringList(
       json['image_urls'] ?? json['images'] ?? json['image_url'],

@@ -10,10 +10,12 @@ import 'package:shimmer/shimmer.dart';
 import '../../property_experience.dart'
     show PropertyContentRepository, PropertyService, serviceIcon;
 import '../../models/room.dart';
+import '../../models/stay_search.dart';
 import '../../core/navigation/app_shell.dart';
 import '../../core/responsive/breakpoints.dart';
 import '../../services/room_service.dart';
 import '../../providers/rooms_provider.dart';
+import '../../providers/stay_search_provider.dart';
 import '../../navigation/room_navigation.dart';
 import '../../theme/app_colors.dart';
 import '../../features/home/widgets/reveal_on_scroll.dart';
@@ -53,6 +55,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   String searchQuery = '';
   List<Room> _rooms = [];
   bool _loading = true;
+  Set<String> _bookedIds = {};
   Object? _error;
   String? _debugError;
   RoomFilters _filters = const RoomFilters();
@@ -89,7 +92,15 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     setState(() => searchQuery = '');
   }
 
-  List<Room> get _filteredRooms => applyFilters(_rooms, _filters, searchQuery);
+  List<Room> get _filteredRooms {
+    final stay = ref.read(staySearchProvider);
+    return applyFilters(
+      _rooms.where((room) => !_bookedIds.contains(room.id)).toList(),
+      _filters,
+      searchQuery,
+      staySearch: stay,
+    );
+  }
 
   Future<void> _debugRoomRowCount() async {
     try {
@@ -116,6 +127,26 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         _debugError = null;
         _loading = false;
       });
+      final stay = ref.read(staySearchProvider);
+      if (stay?.isActive == true) {
+        try {
+          final ids = await _service.fetchBookedRoomIds(
+            checkIn: stay!.checkIn,
+            checkOut: stay.checkOut,
+          );
+          if (mounted) setState(() => _bookedIds = ids);
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Could not check booking availability. Guest filtering is still applied.',
+                ),
+              ),
+            );
+          }
+        }
+      }
     } catch (e, stack) {
       debugPrint('Rooms load error: $e\n$stack');
       if (!mounted) return;
@@ -228,6 +259,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       SliverToBoxAdapter(
                         child: _buildResultsRow(maxWidth, contentWidth),
                       ),
+                      if (ref.watch(staySearchProvider)?.isActive == true)
+                        SliverToBoxAdapter(
+                          child: _staySearchChips(contentWidth),
+                        ),
                       if (_filters.isActive)
                         SliverToBoxAdapter(
                           child: _activeFilterChips(contentWidth),
@@ -253,7 +288,12 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         SliverToBoxAdapter(
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
-                            child: searchQuery.isNotEmpty
+                            child:
+                                ref.watch(staySearchProvider)?.isActive == true
+                                ? _stayEmptyState(
+                                    ref.watch(staySearchProvider)!,
+                                  )
+                                : searchQuery.isNotEmpty
                                 ? _searchEmptyState()
                                 : _state(
                                     Icons.hotel_outlined,
@@ -332,7 +372,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                _filters.isActive || searchQuery.isNotEmpty
+                ref.watch(staySearchProvider)?.isActive == true
+                    ? '${_filteredRooms.length} Rooms for ${ref.watch(staySearchProvider)!.totalGuests} guests'
+                    : _filters.isActive || searchQuery.isNotEmpty
                     ? '${_filteredRooms.length} Rooms found'
                     : '${_filteredRooms.length} Rooms Available',
                 maxLines: 1,
@@ -349,6 +391,68 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
     ),
   );
+
+  Widget _staySearchChips(double width) {
+    final stay = ref.watch(staySearchProvider)!;
+    final dates =
+        '${stay.checkIn.day} ${_month(stay.checkIn.month)} - ${stay.checkOut.day} ${_month(stay.checkOut.month)}';
+    final chips = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _removableChip(dates, _clearStaySearch),
+        const SizedBox(width: 6),
+        _removableChip(
+          '${stay.totalGuests} Guests (${stay.adults} Adults)',
+          _clearStaySearch,
+        ),
+      ],
+    );
+    if (MediaQuery.sizeOf(context).width >= 600) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: width),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Align(alignment: Alignment.centerLeft, child: chips),
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: width),
+        child: SizedBox(
+          height: 44,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: chips,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _month(int month) => const [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][month - 1];
+  void _clearStaySearch() {
+    ref.read(staySearchProvider.notifier).clear();
+    setState(() => _bookedIds = {});
+  }
 
   Widget _activeFilterChips(double maxWidth) {
     final chips = <Widget>[
@@ -489,6 +593,51 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               side: const BorderSide(color: AppColors.gold),
             ),
             child: const Text('Clear Search'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _stayEmptyState(StaySearch stay) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 52, horizontal: 24),
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.search_off_rounded,
+            size: 46,
+            color: AppColors.darkGold,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No rooms for ${stay.totalGuests} guests',
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Try fewer guests or different dates',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.greyText, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: () => context.go('/home'),
+                child: const Text('Change Search'),
+              ),
+              OutlinedButton(
+                onPressed: _clearStaySearch,
+                child: const Text('Clear Search'),
+              ),
+            ],
           ),
         ],
       ),

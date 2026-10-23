@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/room.dart';
+import '../../../models/stay_search.dart';
 import '../../../theme/app_colors.dart';
 import '../models/room_filters.dart';
 
@@ -367,8 +368,9 @@ class _RoomFiltersSheetState extends State<RoomFiltersSheet> {
 List<Room> applyFilters(
   List<Room> rooms,
   RoomFilters filters,
-  String searchQuery,
-) {
+  String searchQuery, {
+  StaySearch? staySearch,
+}) {
   final words = searchQuery
       .toLowerCase()
       .trim()
@@ -377,6 +379,11 @@ List<Room> applyFilters(
       .where((word) => word.isNotEmpty)
       .toList();
   final result = rooms.where((room) {
+    if (staySearch != null &&
+        staySearch.isActive &&
+        room.maxGuests < staySearch.totalGuests) {
+      return false;
+    }
     if (filters.types.isNotEmpty && !filters.types.contains(room.roomType)) {
       return false;
     }

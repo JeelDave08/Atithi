@@ -50,6 +50,34 @@ class RoomService {
     }
   }
 
+  Future<Set<String>> fetchBookedRoomIds({
+    required DateTime checkIn,
+    required DateTime checkOut,
+  }) async {
+    final start = _dateOnly(checkIn), end = _dateOnly(checkOut);
+    final now = DateTime.now().toUtc().toIso8601String();
+    try {
+      final rows = await _client
+          .from('bookings')
+          .select('room_id')
+          .inFilter('booking_status', ['confirmed', 'pending'])
+          .lt('check_in', end)
+          .gt('check_out', start)
+          .or(
+            'booking_status.eq.confirmed,and(booking_status.eq.pending,expires_at.gt.$now)',
+          );
+      return rows.map((row) => row['room_id'].toString()).toSet();
+    } catch (_) {
+      final rows = await _client
+          .from('bookings')
+          .select('room_id')
+          .eq('booking_status', 'confirmed')
+          .lt('check_in', end)
+          .gt('check_out', start);
+      return rows.map((row) => row['room_id'].toString()).toSet();
+    }
+  }
+
   String _dateOnly(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'

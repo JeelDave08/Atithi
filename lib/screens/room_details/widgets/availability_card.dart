@@ -191,7 +191,7 @@ class AvailabilityCard extends StatelessWidget {
               ],
             ),
           ],
-          if (adults + children > maxGuests) ...[
+          if (adults + children >= maxGuests) ...[
             const SizedBox(height: 5),
             Text(
               'Max $maxGuests guests',

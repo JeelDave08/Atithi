@@ -18,6 +18,7 @@ import '../../screens/register_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../screens/rooms/rooms_screen.dart';
 import '../../screens/wishlist/wishlist_screen.dart';
+import '../../providers/stay_search_provider.dart';
 
 final authRepositoryProvider = Provider<AuthService>(
   (ref) => const AuthService(),
@@ -115,6 +116,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               children: selection.children,
             );
           }
+          ref.read(staySearchProvider.notifier).clear();
           return const RoomsScreen();
         },
       ),

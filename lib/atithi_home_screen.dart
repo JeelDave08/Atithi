@@ -1,11 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'core/navigation/app_shell.dart';
+import 'models/stay_search.dart';
+import 'providers/stay_search_provider.dart';
+import 'providers/rooms_provider.dart';
 import 'core/responsive/breakpoints.dart';
 import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
@@ -18,14 +22,14 @@ const _navy = AppColors.navy;
 const _gold = AppColors.gold;
 const _secondaryText = AppColors.secondaryText;
 
-class AtithiHomeScreen extends StatefulWidget {
+class AtithiHomeScreen extends ConsumerStatefulWidget {
   const AtithiHomeScreen({super.key});
 
   @override
-  State<AtithiHomeScreen> createState() => _AtithiHomeScreenState();
+  ConsumerState<AtithiHomeScreen> createState() => _AtithiHomeScreenState();
 }
 
-class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
+class _AtithiHomeScreenState extends ConsumerState<AtithiHomeScreen> {
   late DateTime _checkIn = _dateOnly(DateTime.now());
   late DateTime _checkOut = _dateOnly(DateTime.now())
       .add(const Duration(days: 1));
@@ -87,6 +91,16 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
       );
       return;
     }
+    ref
+        .read(staySearchProvider.notifier)
+        .save(
+          StaySearch(
+            checkIn: _checkIn,
+            checkOut: _checkOut,
+            adults: _adults,
+            children: _children,
+          ),
+        );
     context.push(
       '/rooms',
       extra: RoomSearchSelection(
@@ -99,6 +113,16 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
   }
 
   void _changeCount({required bool adults, required int change}) {
+    final maxGuests =
+        ref
+            .read(roomsProvider)
+            .valueOrNull
+            ?.fold<int>(
+              2,
+              (m, room) => room.maxGuests > m ? room.maxGuests : m,
+            ) ??
+        12;
+    if (_adults + _children + change > maxGuests) return;
     setState(() {
       if (adults) {
         _adults = (_adults + change).clamp(1, 12);
@@ -134,6 +158,16 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
                     checkOut: _checkOut,
                     adults: _adults,
                     children: _children,
+                    maxGuests:
+                        ref
+                            .watch(roomsProvider)
+                            .valueOrNull
+                            ?.fold<int>(
+                              2,
+                              (m, room) =>
+                                  room.maxGuests > m ? room.maxGuests : m,
+                            ) ??
+                        12,
                     onCheckInTap: _selectCheckIn,
                     onCheckOutTap: _selectCheckOut,
                     onAdultsChange: (value) =>
@@ -401,6 +435,7 @@ class BookingCard extends StatelessWidget {
     required this.checkOut,
     required this.adults,
     required this.children,
+    required this.maxGuests,
     required this.onCheckInTap,
     required this.onCheckOutTap,
     required this.onAdultsChange,
@@ -412,6 +447,7 @@ class BookingCard extends StatelessWidget {
   final DateTime checkOut;
   final int adults;
   final int children;
+  final int maxGuests;
   final VoidCallback onCheckInTap;
   final VoidCallback onCheckOutTap;
   final ValueChanged<int> onAdultsChange;
@@ -458,6 +494,7 @@ class BookingCard extends StatelessWidget {
                 ),
                 label: 'Adults',
                 count: adults,
+                canIncrement: adults + children < maxGuests,
                 onDecrement: () => onAdultsChange(-1),
                 onIncrement: () => onAdultsChange(1),
               ),
@@ -473,6 +510,7 @@ class BookingCard extends StatelessWidget {
                 iconWidget: const _ChildFaceIcon(size: 26, color: _navy),
                 label: 'Children',
                 count: children,
+                canIncrement: adults + children < maxGuests,
                 onDecrement: () => onChildrenChange(-1),
                 onIncrement: () => onChildrenChange(1),
               ),
@@ -540,6 +578,17 @@ class BookingCard extends StatelessWidget {
                           color: _gold.withValues(alpha: 0.35),
                         ),
                         guestsRow,
+                        if (adults + children >= maxGuests)
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Max $maxGuests guests per room',
+                              style: TextStyle(
+                                color: _secondaryText,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 20),
                         searchButton,
                       ],
@@ -574,6 +623,7 @@ class BookingCard extends StatelessWidget {
                             ),
                             label: 'Adults',
                             count: adults,
+                            canIncrement: adults + children < maxGuests,
                             onDecrement: () => onAdultsChange(-1),
                             onIncrement: () => onAdultsChange(1),
                           ),
@@ -588,6 +638,7 @@ class BookingCard extends StatelessWidget {
                             ),
                             label: 'Children',
                             count: children,
+                            canIncrement: adults + children < maxGuests,
                             onDecrement: () => onChildrenChange(-1),
                             onIncrement: () => onChildrenChange(1),
                           ),
@@ -668,6 +719,7 @@ class _GuestCounter extends StatelessWidget {
     required this.count,
     required this.onDecrement,
     required this.onIncrement,
+    this.canIncrement = true,
   });
 
   final Widget iconWidget;
@@ -675,6 +727,7 @@ class _GuestCounter extends StatelessWidget {
   final int count;
   final VoidCallback onDecrement;
   final VoidCallback onIncrement;
+  final bool canIncrement;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -692,7 +745,11 @@ class _GuestCounter extends StatelessWidget {
           const Spacer(),
           _CircleRoundButton(icon: Icons.remove, onTap: onDecrement),
           const SizedBox(width: 4),
-          _CircleRoundButton(icon: Icons.add, onTap: onIncrement),
+          _CircleRoundButton(
+            icon: Icons.add,
+            onTap: onIncrement,
+            enabled: canIncrement,
+          ),
         ],
       );
       final labelRow = Row(
@@ -752,18 +809,23 @@ class _GuestCounter extends StatelessWidget {
 }
 
 class _CircleRoundButton extends StatelessWidget {
-  const _CircleRoundButton({required this.icon, required this.onTap});
+  const _CircleRoundButton({
+    required this.icon,
+    required this.onTap,
+    this.enabled = true,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: const Color(0xFFEFE8D8),
+    color: enabled ? const Color(0xFFEFE8D8) : const Color(0xFFE5E0D6),
     shape: const CircleBorder(),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: SizedBox(
         width: 44,
         height: 44,
