@@ -16,11 +16,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'features/home/widgets/reveal_on_scroll.dart';
 import 'models/room.dart';
 import 'theme/app_colors.dart';
-import 'widgets/auto_slide_rooms.dart';
 import 'widgets/auto_slide_services.dart';
 import 'widgets/app_network_image.dart';
 import 'providers/rooms_provider.dart';
 import 'navigation/room_navigation.dart';
+import 'core/navigation/app_shell.dart';
+import 'core/responsive/app_container.dart';
+import 'core/responsive/breakpoints.dart';
+import 'widgets/wishlist_button.dart';
 
 const _experienceCream = AppColors.cream;
 const _experienceCard = AppColors.surface;
@@ -355,6 +358,7 @@ class _PropertyAboutScreenState extends State<PropertyAboutScreen> {
   @override
   Widget build(BuildContext context) => _PropertyPage(
     title: 'About Atithi',
+    activeRoute: '/about',
     child: FutureBuilder<PropertyContent?>(
       future: _property,
       builder: (context, snapshot) {
@@ -465,77 +469,103 @@ class _AboutContentState extends State<_AboutContent>
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
       children: [
-        _enter(0, const _AboutHero()),
-        const SizedBox(height: 22),
-        _enter(
-          1,
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AnimatedBuilder(
-                animation: _shimmerController,
-                builder: (context, child) {
-                  final progress = reducedMotion
-                      ? 0.5
-                      : _shimmerController.value;
-                  final shift = -1.6 + progress * 3.2;
-                  return ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => LinearGradient(
-                      begin: Alignment(shift, 0),
-                      end: Alignment(shift + 1.1, 0),
-                      colors: const [
-                        _experienceNavy,
-                        _experienceGold,
-                        _experienceNavy,
-                      ],
-                      stops: const [0.35, 0.5, 0.65],
-                    ).createShader(bounds),
-                    child: child,
-                  );
-                },
-                child: Text(
-                  'Atithi',
-                  style: GoogleFonts.playfairDisplay(
-                    color: _experienceNavy,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 760;
+            final introduction = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _enter(
+                  1,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _shimmerController,
+                        builder: (context, child) {
+                          final progress = reducedMotion
+                              ? 0.5
+                              : _shimmerController.value;
+                          final shift = -1.6 + progress * 3.2;
+                          return ShaderMask(
+                            blendMode: BlendMode.srcIn,
+                            shaderCallback: (bounds) => LinearGradient(
+                              begin: Alignment(shift, 0),
+                              end: Alignment(shift + 1.1, 0),
+                              colors: const [
+                                _experienceNavy,
+                                _experienceGold,
+                                _experienceNavy,
+                              ],
+                              stops: const [0.35, 0.5, 0.65],
+                            ).createShader(bounds),
+                            child: child,
+                          );
+                        },
+                        child: Text(
+                          'Atithi',
+                          style: GoogleFonts.playfairDisplay(
+                            color: _experienceNavy,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 66),
+                        duration: reducedMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 850),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, width, _) => Container(
+                          width: width,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: _experienceGold,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 66),
-                duration: reducedMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 850),
-                curve: Curves.easeOutCubic,
-                builder: (context, width, _) => Container(
-                  width: width,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: _experienceGold,
-                    borderRadius: BorderRadius.circular(4),
+                const SizedBox(height: 10),
+                _enter(
+                  2,
+                  Text(
+                    widget.property.description.isEmpty
+                        ? 'Property introduction is not available yet.'
+                        : widget.property.description,
+                    style: GoogleFonts.dmSans(
+                      color: AppColors.secondaryText,
+                      height: 1.65,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        _enter(
-          2,
-          Text(
-            widget.property.description.isEmpty
-                ? 'Property introduction is not available yet.'
-                : widget.property.description,
-            style: GoogleFonts.dmSans(
-              color: AppColors.secondaryText,
-              height: 1.65,
-              fontSize: 15,
-            ),
-          ),
+              ],
+            );
+            if (wide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: _enter(0, const _AboutHero())),
+                  const SizedBox(width: 28),
+                  Expanded(child: introduction),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _enter(0, const _AboutHero()),
+                const SizedBox(height: 22),
+                introduction,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 22),
         _enter(3, _AboutStatsRow(statsFuture: _statsFuture)),
@@ -1282,6 +1312,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
   @override
   Widget build(BuildContext context) => _PropertyPage(
     title: 'Our Services',
+    activeRoute: '/services',
     child: FutureBuilder<PropertyContent?>(
       future: _property,
       builder: (context, snapshot) {
@@ -1322,27 +1353,51 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
                 message: 'No active services have been published yet.',
               );
             }
+            final columns = context.screenWidth >= 1024
+                ? 4
+                : context.screenWidth >= 600
+                ? 3
+                : 2;
             return RefreshIndicator(
               onRefresh: () => _refreshServices(property?.id),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                children: [
-                  if (property != null) ...[
-                    const Text(
-                      'Atithi',
-                      style: TextStyle(
-                        color: _experienceNavy,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                    sliver: SliverList.list(
+                      children: [
+                        if (property != null) ...[
+                          const Text(
+                            'Atithi',
+                            style: TextStyle(
+                              color: _experienceNavy,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 4,
+                        childAspectRatio: columns == 2 ? 1.65 : 1.2,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => _AnimatedSection(
+                          delay: Duration(milliseconds: (i * 50).clamp(0, 400)),
+                          child: _ServiceCard(service: services[i]),
+                        ),
+                        childCount: services.length,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                  ],
-                  for (var i = 0; i < services.length; i++)
-                    _AnimatedSection(
-                      delay: Duration(milliseconds: (i * 50).clamp(0, 400)),
-                      child: _ServiceCard(service: services[i]),
-                    ),
+                  ),
                 ],
               ),
             );
@@ -1450,6 +1505,7 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
   @override
   Widget build(BuildContext context) => _PropertyPage(
     title: 'Contact Us',
+    activeRoute: '/contact',
     child: FutureBuilder<PropertyContent?>(
       future: _property,
       builder: (context, snapshot) {
@@ -1861,6 +1917,7 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
   @override
   Widget build(BuildContext context) => _PropertyPage(
     title: 'My Bookings',
+    activeRoute: '/bookings',
     child: FutureBuilder<List<Map<String, dynamic>>>(
       future: _bookings,
       builder: (context, snapshot) {
@@ -1916,137 +1973,161 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
             ),
           );
         }
-        return RefreshIndicator(
-          onRefresh: () async {
-            final future = widget.repository.getMyBookings();
-            setState(() => _bookings = future);
-            await future;
-          },
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            itemCount: bookings.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final booking = bookings[index];
-              final roomData = booking['rooms'];
-              final roomRow = roomData is Map
-                  ? Map<String, dynamic>.from(roomData)
-                  : const <String, dynamic>{};
-              final room =
-                  _bookingValue(roomRow, 'room_name') ??
-                  _bookingValue(roomRow, 'room_number') ??
-                  _bookingValue(booking, 'room_id');
-              final roomImages = Room.fromJson(roomRow).imageUrls;
-              final imageUrl = roomImages.isEmpty ? null : roomImages.first;
-              final rawStatus = _bookingValue(booking, 'booking_status');
-              final status = rawStatus?.toLowerCase() == 'pending'
-                  ? 'Pending'
-                  : rawStatus;
-              final checkIn = _bookingValue(booking, 'check_in');
-              final checkOut = _bookingValue(booking, 'check_out');
-              final total = _bookingValue(booking, 'total_amount');
-              final statusColor = status?.toLowerCase() == 'confirmed'
-                  ? AppColors.darkGold
-                  : status?.toLowerCase() == 'cancelled'
-                  ? AppColors.greyText
-                  : AppColors.navy;
-              return Container(
-                padding: const EdgeInsets.all(17),
-                decoration: BoxDecoration(
-                  color: _experienceCard,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: _experienceLightGold.withValues(alpha: .65),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final desktop = constraints.maxWidth >= 1024;
+            return RefreshIndicator(
+              onRefresh: () async {
+                final future = widget.repository.getMyBookings();
+                setState(() => _bookings = future);
+                await future;
+              },
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1136),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: desktop ? 2 : 1,
+                      mainAxisExtent: desktop ? 196 : 186,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: bookings.length,
+                    itemBuilder: (context, index) {
+                      final booking = bookings[index];
+                      final roomData = booking['rooms'];
+                      final roomRow = roomData is Map
+                          ? Map<String, dynamic>.from(roomData)
+                          : const <String, dynamic>{};
+                      final room =
+                          _bookingValue(roomRow, 'room_name') ??
+                          _bookingValue(roomRow, 'room_number') ??
+                          _bookingValue(booking, 'room_id');
+                      final roomImages = Room.fromJson(roomRow).imageUrls;
+                      final imageUrl = roomImages.isEmpty
+                          ? null
+                          : roomImages.first;
+                      final rawStatus = _bookingValue(
+                        booking,
+                        'booking_status',
+                      );
+                      final status = rawStatus?.toLowerCase() == 'pending'
+                          ? 'Pending'
+                          : rawStatus;
+                      final checkIn = _bookingValue(booking, 'check_in');
+                      final checkOut = _bookingValue(booking, 'check_out');
+                      final total = _bookingValue(booking, 'total_amount');
+                      final statusColor = status?.toLowerCase() == 'confirmed'
+                          ? AppColors.darkGold
+                          : status?.toLowerCase() == 'cancelled'
+                          ? AppColors.greyText
+                          : AppColors.navy;
+                      return Container(
+                        padding: const EdgeInsets.all(17),
+                        decoration: BoxDecoration(
+                          color: _experienceCard,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: _experienceLightGold.withValues(alpha: .65),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: SizedBox(
+                                width: 90,
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: AppNetworkImage(url: imageUrl),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          room ?? 'Reservation',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.navy,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (status != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 9,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.cream,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            status,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: statusColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (checkIn != null || checkOut != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Stay: ${checkIn ?? '—'} – ${checkOut ?? '—'}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.greyText,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                  if (total != null) ...[
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      'Total: ${NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(num.tryParse(total) ?? 0)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.navy,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
-                      child: SizedBox(
-                        width: 78,
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: AppNetworkImage(url: imageUrl),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  room ?? 'Reservation',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.navy,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              if (status != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cream,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: statusColor,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          if (checkIn != null || checkOut != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'Stay: ${checkIn ?? '—'} – ${checkOut ?? '—'}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.greyText,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                          if (total != null) ...[
-                            const SizedBox(height: 5),
-                            Text(
-                              'Total: ${NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(num.tryParse(total) ?? 0)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.navy,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     ),
@@ -2130,15 +2211,129 @@ class PropertyRoomsPreview extends ConsumerWidget {
         if (rooms.isEmpty) {
           return const _InlineDataState(text: 'No rooms are available yet.');
         }
-        final previewRooms = rooms.take(5).toList(growable: false);
-        return AutoSlideRooms(
-          itemCount: previewRooms.length,
-          itemBuilder: (context, index) =>
-              RepaintBoundary(child: _RoomCard(room: previewRooms[index])),
-        );
+        return _ResponsiveHomeRooms(rooms: rooms.take(5).toList());
       },
     );
   }
+}
+
+class _ResponsiveHomeRooms extends StatefulWidget {
+  const _ResponsiveHomeRooms({required this.rooms});
+  final List<Room> rooms;
+
+  @override
+  State<_ResponsiveHomeRooms> createState() => _ResponsiveHomeRoomsState();
+}
+
+class _ResponsiveHomeRoomsState extends State<_ResponsiveHomeRooms> {
+  final PageController _controller = PageController();
+  final PageController _mobileController = PageController(
+    viewportFraction: .88,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _mobileController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const cardHeight = 520.0;
+      final width = constraints.maxWidth;
+      if (width < 600) {
+        return SizedBox(
+          height: cardHeight,
+          child: PageView.builder(
+            controller: _mobileController,
+            itemCount: widget.rooms.length,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: _RoomCard(room: widget.rooms[index]),
+            ),
+          ),
+        );
+      }
+
+      final columns = width < 1024 ? 2 : 3;
+      final pageCount = (widget.rooms.length / columns).ceil();
+      return SizedBox(
+        height: cardHeight,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: pageCount,
+              itemBuilder: (context, page) => Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var column = 0; column < columns; column++) ...[
+                    if (column > 0) const SizedBox(width: 14),
+                    Expanded(
+                      child: page * columns + column >= widget.rooms.length
+                          ? const SizedBox.shrink()
+                          : _RoomCard(
+                              room: widget.rooms[page * columns + column],
+                            ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (width >= 1024 && pageCount > 1) ...[
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: _RoomGalleryArrow(
+                  icon: Icons.chevron_left_rounded,
+                  onPressed: () => _controller.previousPage(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: _RoomGalleryArrow(
+                  icon: Icons.chevron_right_rounded,
+                  onPressed: () => _controller.nextPage(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _RoomGalleryArrow extends StatelessWidget {
+  const _RoomGalleryArrow({required this.icon, required this.onPressed});
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Material(
+      color: AppColors.navy.withValues(alpha: .86),
+      shape: const CircleBorder(),
+      child: IconButton(
+        tooltip: icon == Icons.chevron_left_rounded
+            ? 'Previous rooms'
+            : 'Next rooms',
+        onPressed: onPressed,
+        icon: Icon(icon, color: AppColors.gold),
+      ),
+    ),
+  );
 }
 
 class PropertyServicesPreview extends StatelessWidget {
@@ -2439,9 +2634,26 @@ class _RoomCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => openRoomDetails(context, room),
-          child: _RoomImageCarousel(imageUrls: room.imageUrls, height: 175),
+        Stack(
+          children: [
+            InkWell(
+              onTap: () => openRoomDetails(context, room),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final imageHeight = constraints.maxWidth * 10 / 16;
+                  return _RoomImageCarousel(
+                    imageUrls: room.imageUrls,
+                    height: imageHeight,
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: WishlistButton(roomId: room.id),
+            ),
+          ],
         ),
         Expanded(child: _roomDetails(context)),
       ],
@@ -2782,26 +2994,41 @@ class _RoomImageCarouselState extends State<_RoomImageCarousel> {
 }
 
 class _PropertyPage extends StatelessWidget {
-  const _PropertyPage({required this.title, required this.child});
+  const _PropertyPage({
+    required this.title,
+    required this.child,
+    this.activeRoute,
+  });
   final String title;
   final Widget child;
+  final String? activeRoute;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _experienceCream,
-    appBar: AppBar(
+  Widget build(BuildContext context) {
+    final page = Scaffold(
       backgroundColor: _experienceCream,
-      foregroundColor: _experienceNavy,
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: _experienceNavy,
-          fontWeight: FontWeight.w700,
+      appBar: AppBar(
+        backgroundColor: _experienceCream,
+        foregroundColor: _experienceNavy,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: _experienceNavy,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
-    ),
-    body: SafeArea(child: child),
-  );
+      body: SafeArea(
+        child: AppContainer(padding: EdgeInsets.zero, child: child),
+      ),
+    );
+    if (activeRoute == null) return page;
+    return AppShell(
+      activeRoute: activeRoute!,
+      wrapInContainer: false,
+      body: page,
+    );
+  }
 }
 
 class _PropertyImage extends StatelessWidget {

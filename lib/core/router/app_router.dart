@@ -17,6 +17,7 @@ import '../../screens/forgot_password_screen.dart';
 import '../../screens/register_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../screens/rooms/rooms_screen.dart';
+import '../../screens/wishlist/wishlist_screen.dart';
 
 final authRepositoryProvider = Provider<AuthService>(
   (ref) => const AuthService(),
@@ -37,8 +38,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (location == '/splash') return null;
       final user = await auth.currentUserId();
       const authLocations = {'/auth', '/register', '/forgot-password'};
-      if (user == null && !authLocations.contains(location)) return '/auth';
-      if (user != null && authLocations.contains(location)) return '/home';
+      if (user == null &&
+          !authLocations.contains(location) &&
+          location != '/wishlist') {
+        return '/auth';
+      }
+      if (user != null && authLocations.contains(location)) {
+        return '/home';
+      }
       return null;
     },
     routes: [
@@ -63,6 +70,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/wishlist',
+        builder: (context, state) => const WishlistScreen(),
       ),
       GoRoute(
         path: '/property',

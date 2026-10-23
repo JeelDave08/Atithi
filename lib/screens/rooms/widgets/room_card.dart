@@ -11,8 +11,8 @@ import 'room_image_carousel.dart';
 class RoomCard extends StatelessWidget {
   const RoomCard({
     required this.room,
-    required this.isFavorite,
-    required this.onFavorite,
+    this.isFavorite = false,
+    this.onFavorite,
     required this.onDetails,
     required this.onBook,
     this.scrollOffset,
@@ -20,7 +20,8 @@ class RoomCard extends StatelessWidget {
   });
   final Room room;
   final bool isFavorite;
-  final VoidCallback onFavorite, onDetails, onBook;
+  final VoidCallback? onFavorite;
+  final VoidCallback onDetails, onBook;
   final ValueListenable<double>? scrollOffset;
   @override
   Widget build(BuildContext context) {
@@ -48,12 +49,7 @@ class RoomCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (scrollOffset == null)
-              RoomImageCarousel(
-                key: ValueKey(room.id),
-                room: room,
-                isFavorite: isFavorite,
-                onFavorite: onFavorite,
-              )
+              RoomImageCarousel(key: ValueKey(room.id), room: room)
             // Scroll movement repaints only the image instead of rebuilding the list.
             else
               ValueListenableBuilder<double>(
@@ -64,8 +60,6 @@ class RoomCard extends StatelessWidget {
                     child: RoomImageCarousel(
                       key: ValueKey(room.id),
                       room: room,
-                      isFavorite: isFavorite,
-                      onFavorite: onFavorite,
                     ),
                   ),
                 ),

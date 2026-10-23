@@ -1,12 +1,15 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'core/router/app_router.dart';
 import 'core/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'providers/wishlist_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,11 +45,44 @@ class AtithiApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Start the wishlist auth listener immediately so persisted Supabase
+    // sessions refresh saved room ids as soon as the app opens.
+    ref.watch(wishlistProvider);
     return MaterialApp.router(
       title: 'Atithi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: ref.watch(routerProvider),
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final scale = media.textScaler.scale(1).clamp(0.9, 1.15).toDouble();
+        Widget app = MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(scale)),
+          child: ScrollConfiguration(
+            behavior: const _AtithiScrollBehavior(),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+        if (kIsWeb) {
+          app = ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 320),
+            child: app,
+          );
+        }
+        return app;
+      },
     );
   }
+}
+
+class _AtithiScrollBehavior extends MaterialScrollBehavior {
+  const _AtithiScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 }

@@ -131,31 +131,4 @@ class RoomService {
         .toList()
       ..sort();
   }
-
-  Future<Set<String>> fetchFavoriteIds(String userId) async {
-    final rows = await _client
-        .from('favorites')
-        .select('room_id')
-        .eq('user_id', userId);
-    return rows.map((row) => row['room_id'] as String).toSet();
-  }
-
-  Future<void> toggleFavorite(
-    String userId,
-    String roomId, {
-    required bool isFavorite,
-  }) async {
-    if (isFavorite) {
-      await _client
-          .from('favorites')
-          .delete()
-          .eq('user_id', userId)
-          .eq('room_id', roomId);
-    } else {
-      await _client.from('favorites').insert({
-        'user_id': userId,
-        'room_id': roomId,
-      });
-    }
-  }
 }

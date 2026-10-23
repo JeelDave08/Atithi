@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/room.dart';
+import '../../core/responsive/app_container.dart';
 import '../../services/booking_service.dart';
 import '../../theme/app_colors.dart';
 import '../room_details/room_details_constants.dart';
@@ -399,6 +400,14 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
       );
 
+  void _goBack() {
+    if (Navigator.of(context).canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -408,7 +417,7 @@ class _BookingScreenState extends State<BookingScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final contentWidth = width > 700 ? 640.0 : width;
+          final contentWidth = width >= 600 ? 640.0 : width;
           return Scaffold(
             backgroundColor: AppColors.cream,
             resizeToAvoidBottomInset: true,
@@ -417,75 +426,80 @@ class _BookingScreenState extends State<BookingScreen> {
               autovalidateMode: _autoValidate
                   ? AutovalidateMode.onUserInteraction
                   : AutovalidateMode.disabled,
-              child: CustomScrollView(
-                controller: _scrollController,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: BookingHeader(
-                      onBack: () => Navigator.maybePop(context),
+              child: AppContainer(
+                padding: EdgeInsets.zero,
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  slivers: [
+                    SliverToBoxAdapter(child: BookingHeader(onBack: _goBack)),
+                    SliverToBoxAdapter(
+                      child: _section(width, contentWidth, _guestInformation()),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _guestInformation()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _guestPhotoCard()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _idProofCard()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _guestCountCard()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _datesCard()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(
-                      width,
-                      contentWidth,
-                      _specialRequestsCard(),
+                    SliverToBoxAdapter(
+                      child: _section(width, contentWidth, _guestPhotoCard()),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(
-                      width,
-                      contentWidth,
-                      BookingRoomSummary(room: widget.room),
+                    SliverToBoxAdapter(
+                      child: _section(width, contentWidth, _idProofCard()),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(
-                      width,
-                      contentWidth,
-                      BookingSummaryCard(
-                        room: widget.room,
-                        checkIn: _checkIn,
-                        checkOut: _checkOut,
-                        adults: _adults,
-                        children: _children,
+                    SliverToBoxAdapter(
+                      child: _section(width, contentWidth, _guestCountCard()),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _section(width, contentWidth, _datesCard()),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _section(
+                        width,
+                        contentWidth,
+                        _specialRequestsCard(),
                       ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(width, contentWidth, _bottomFormActions()),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _section(
-                      width,
-                      contentWidth,
-                      const BookingTrustStrip(),
+                    SliverToBoxAdapter(
+                      child: _section(
+                        width,
+                        contentWidth,
+                        BookingRoomSummary(room: widget.room),
+                      ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height:
-                          media.padding.bottom + (width < 390 ? 152 : 84) + 16,
+                    SliverToBoxAdapter(
+                      child: _section(
+                        width,
+                        contentWidth,
+                        BookingSummaryCard(
+                          room: widget.room,
+                          checkIn: _checkIn,
+                          checkOut: _checkOut,
+                          adults: _adults,
+                          children: _children,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    SliverToBoxAdapter(
+                      child: _section(
+                        width,
+                        contentWidth,
+                        _bottomFormActions(),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _section(
+                        width,
+                        contentWidth,
+                        const BookingTrustStrip(),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height:
+                            media.padding.bottom +
+                            (width < 390 ? 152 : 84) +
+                            16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             bottomNavigationBar: BookingStickyBar(
@@ -1051,7 +1065,7 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 8),
       ],
       OutlinedButton.icon(
-        onPressed: _submitting ? null : () => Navigator.maybePop(context),
+        onPressed: _submitting ? null : _goBack,
         icon: const Icon(Icons.arrow_back_outlined),
         label: const Text('Back'),
         style: OutlinedButton.styleFrom(
