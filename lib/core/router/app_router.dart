@@ -38,7 +38,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       if (location == '/splash') return null;
       final user = await auth.currentUserId();
-      const authLocations = {'/auth', '/register', '/forgot-password'};
+      const authLocations = {'/auth', '/register', '/forgot-password', '/login'};
       if (user == null &&
           !authLocations.contains(location) &&
           location != '/wishlist') {
@@ -58,6 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => AuthScreen(authRepository: auth),
+      ),
+      GoRoute(
+        path: '/login',
+        redirect: (context, state) => '/auth',
       ),
       GoRoute(
         path: '/register',

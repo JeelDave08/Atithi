@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
@@ -31,8 +32,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entranceController;
   _ProfileData? _profile;
-  bool _loading = true;
+  bool _loading = false;
   int? _bookingsCount;
+  StreamSubscription<AuthState>? _supabaseAuthSubscription;
+  StreamSubscription<firebase.User?>? _firebaseAuthSubscription;
 
   @override
   void initState() {
@@ -41,57 +44,158 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     );
-    _loadProfile();
-    _loadBookingsCount();
+    _initImmediateProfile();
+    _loadBackgroundData();
+    _setupAuthListeners();
   }
 
-  Future<void> _loadProfile() async {
-    await Future<void>.delayed(Duration.zero);
-    final user = firebase.FirebaseAuth.instance.currentUser;
-    if (!mounted) return;
+  void _initImmediateProfile() {
+    final suUser = Supabase.instance.client.auth.currentUser;
+    final fbUser = firebase.FirebaseAuth.instance.currentUser;
 
-    // Try to fetch full_name from Supabase profiles table.
-    String? supabaseName;
-    String? supabasePhone;
-    if (user != null) {
-      try {
-        final row = await Supabase.instance.client
-            .from('profiles')
-            .select('full_name, phone')
-            .eq('firebase_uid', user.uid)
-            .maybeSingle();
-        supabaseName = _ProfileData._nonEmpty(row?['full_name']);
-        supabasePhone = _ProfileData._nonEmpty(row?['phone']);
-      } catch (_) {}
+    if (suUser == null && fbUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/login');
+      });
+      return;
     }
 
-    if (!mounted) return;
-    setState(() {
-      _profile = _ProfileData.fromFirebaseUser(
-        user,
-        supabaseName: supabaseName,
-        supabasePhone: supabasePhone,
-      );
-      _loading = false;
-    });
+    _profile = _ProfileData.buildImmediate(
+      supabaseUser: suUser,
+      firebaseUser: fbUser,
+    );
+    _loading = false;
     _entranceController.forward();
   }
 
-  Future<void> _loadBookingsCount() async {
-    final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      if (mounted) setState(() => _bookingsCount = 0);
+  void _setupAuthListeners() {
+    try {
+      _supabaseAuthSubscription =
+          Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+        if (!mounted) return;
+        if (data.session == null &&
+            firebase.FirebaseAuth.instance.currentUser == null) {
+          context.go('/login');
+        } else {
+          // Do not reset loading to true repeatedly.
+          _loadBackgroundData();
+        }
+      });
+    } catch (e) {
+      debugPrint('Supabase onAuthStateChange error: $e');
+    }
+
+    try {
+      _firebaseAuthSubscription =
+          firebase.FirebaseAuth.instance.authStateChanges().listen((user) {
+        if (!mounted) return;
+        if (user == null &&
+            Supabase.instance.client.auth.currentUser == null) {
+          context.go('/login');
+        } else {
+          // Do not reset loading to true repeatedly.
+          _loadBackgroundData();
+        }
+      });
+    } catch (e) {
+      debugPrint('Firebase authStateChanges error: $e');
+    }
+  }
+
+  Future<void> _loadBackgroundData() async {
+    final suUser = Supabase.instance.client.auth.currentUser;
+    final fbUser = firebase.FirebaseAuth.instance.currentUser;
+    final uid = suUser?.id ?? fbUser?.uid;
+
+    if (suUser == null && fbUser == null) {
+      if (mounted) context.go('/login');
       return;
     }
+
+    // 1. Fetch profiles row with timeout and maybeSingle
     try {
-      final rows = await Supabase.instance.client
-          .from('bookings')
-          .select('id')
-          .eq('user_id', uid);
-      if (mounted) setState(() => _bookingsCount = rows.length);
+      Map<String, dynamic>? row;
+      if (fbUser != null) {
+        try {
+          row = await Supabase.instance.client
+              .from('profiles')
+              .select('full_name, phone')
+              .eq('firebase_uid', fbUser.uid)
+              .maybeSingle()
+              .timeout(const Duration(seconds: 8));
+        } catch (e) {
+          debugPrint('Profile row fetch (firebase_uid) failed: $e');
+        }
+      }
+
+      if (row == null && suUser != null) {
+        try {
+          row = await Supabase.instance.client
+              .from('profiles')
+              .select('full_name, phone')
+              .eq('id', suUser.id)
+              .maybeSingle()
+              .timeout(const Duration(seconds: 8));
+        } catch (e) {
+          debugPrint('Profile row fetch (id) failed: $e');
+        }
+      }
+
+      if (row != null && mounted) {
+        final sName = _ProfileData._nonEmpty(row['full_name']);
+        final sPhone = _ProfileData._nonEmpty(row['phone']);
+        setState(() {
+          _profile = _ProfileData.buildImmediate(
+            supabaseUser: suUser,
+            firebaseUser: fbUser,
+            supabaseName: sName,
+            supabasePhone: sPhone,
+          );
+        });
+      }
     } catch (error) {
-      debugPrint('Profile booking count failed: $error');
-      if (mounted) setState(() => _bookingsCount = 0);
+      debugPrint('Background profile fetch error: $error');
+    }
+
+    // 2. Fetch bookings count with timeout and error fallback to 0
+    try {
+      var count = 0;
+      if (uid != null) {
+        try {
+          final rows = await Supabase.instance.client
+              .from('bookings')
+              .select('id')
+              .eq('user_id', uid)
+              .timeout(const Duration(seconds: 8));
+          count = rows.length;
+        } catch (e) {
+          debugPrint('Bookings count (user_id) failed: $e');
+          if (fbUser != null) {
+            try {
+              final fbRows = await Supabase.instance.client
+                  .from('bookings')
+                  .select('id')
+                  .eq('firebase_uid', fbUser.uid)
+                  .timeout(const Duration(seconds: 8));
+              count = fbRows.length;
+            } catch (e2) {
+              debugPrint('Bookings count (firebase_uid) failed: $e2');
+            }
+          }
+        }
+      }
+      if (mounted) {
+        setState(() => _bookingsCount = count);
+      }
+    } catch (error) {
+      debugPrint('Background bookings count error: $error');
+      if (mounted) {
+        setState(() => _bookingsCount = 0);
+      }
+    } finally {
+      if (mounted && _loading) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -102,11 +206,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Future<bool> _signOut(BuildContext sheetContext) async {
     try {
-      await firebase.FirebaseAuth.instance.signOut();
+      try {
+        await Supabase.instance.client.auth
+            .signOut()
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Supabase signOut error: $e');
+      }
+      try {
+        await firebase.FirebaseAuth.instance
+            .signOut()
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Firebase signOut error: $e');
+      }
       if (!mounted) return false;
-      context.go('/auth');
+      context.go('/login');
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Logout failed: $e');
       if (!mounted) return false;
       if (sheetContext.mounted) Navigator.of(sheetContext).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,8 +254,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       builder: (sheetCtx) => _AddPhoneSheet(
         onSaved: () {
           if (!mounted) return;
-          setState(() => _loading = true);
-          _loadProfile();
+          _loadBackgroundData();
         },
       ),
     );
@@ -145,6 +262,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   @override
   void dispose() {
+    _supabaseAuthSubscription?.cancel();
+    _firebaseAuthSubscription?.cancel();
     _entranceController.dispose();
     super.dispose();
   }
@@ -163,7 +282,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           const _ProfileGlows(),
           SafeArea(
             bottom: false,
-            child: _loading
+            child: _loading && _profile == null
                 ? const Center(
                     child: CircularProgressIndicator(color: _profileGold),
                   )
@@ -192,9 +311,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           child: ProfileHeader(
                             name: _profile?.displayName ?? 'Guest',
                             isGuest: _profile?.displayName == null,
-                            bookings: _bookingsCount?.toString() ?? '…',
+                            bookings: _bookingsCount?.toString() ?? '—',
                             favorites: ref.watch(wishlistProvider).loading
-                                ? '…'
+                                ? '—'
                                 : ref.watch(wishlistProvider).count.toString(),
                             onFavoritesTap: () => context.push('/wishlist'),
                             memberSince: _profile?.memberSince ?? '—',
@@ -789,13 +908,19 @@ class _ProfileData {
   final String? phone;
   final String? memberSince;
 
-  factory _ProfileData.fromFirebaseUser(
-    firebase.User? user, {
+  factory _ProfileData.buildImmediate({
+    User? supabaseUser,
+    firebase.User? firebaseUser,
     String? supabaseName,
     String? supabasePhone,
   }) {
-    final email = _nonEmpty(user?.email);
-    final createdAt = user?.metadata.creationTime;
+    final email = _nonEmpty(supabaseUser?.email) ?? _nonEmpty(firebaseUser?.email);
+    DateTime? createdAt = firebaseUser?.metadata.creationTime;
+    if (createdAt == null && supabaseUser?.createdAt != null) {
+      try {
+        createdAt = DateTime.tryParse(supabaseUser!.createdAt);
+      } catch (_) {}
+    }
 
     // Name resolution chain.
     String? resolvedName;
@@ -804,18 +929,10 @@ class _ProfileData {
     // 1. Supabase profiles.full_name
     resolvedName = supabaseName;
 
-    // 2. Firebase displayName
-    resolvedName ??= _nonEmpty(user?.displayName);
-
-    // 3. userMetadata fields
-    if (resolvedName == null) {
-      final meta = user?.providerData.isEmpty == true
-          ? <String, dynamic>{}
-          : (user?.providerData.first as dynamic)?.additionalUserInfo
-                  ?.profile as Map<String, dynamic>? ??
-              <String, dynamic>{};
+    // 2. Supabase userMetadata (e.g. 'full_name', 'name', 'display_name')
+    if (resolvedName == null && supabaseUser?.userMetadata != null) {
       for (final key in ['full_name', 'name', 'display_name']) {
-        final v = _nonEmpty(meta[key]);
+        final v = _nonEmpty(supabaseUser!.userMetadata![key]);
         if (v != null) {
           resolvedName = v;
           break;
@@ -823,10 +940,30 @@ class _ProfileData {
       }
     }
 
-    // 4. Email prefix -> capitalized words
+    // 3. Firebase displayName
+    resolvedName ??= _nonEmpty(firebaseUser?.displayName);
+
+    // 4. Firebase userMetadata / providerData fields
+    if (resolvedName == null && firebaseUser != null) {
+      try {
+        final meta = firebaseUser.providerData.isEmpty == true
+            ? <String, dynamic>{}
+            : (firebaseUser.providerData.first as dynamic)?.additionalUserInfo
+                    ?.profile as Map<String, dynamic>? ??
+                <String, dynamic>{};
+        for (final key in ['full_name', 'name', 'display_name']) {
+          final v = _nonEmpty(meta[key]);
+          if (v != null) {
+            resolvedName = v;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5. Email prefix -> capitalized words
     if (resolvedName == null && email != null) {
       final prefix = email.split('@').first;
-      // Split on . _ - and digit sequences.
       final parts = prefix.split(RegExp(r'[.\-_0-9]+'))
           .where((p) => p.isNotEmpty)
           .map((p) => p[0].toUpperCase() + p.substring(1).toLowerCase())
@@ -837,8 +974,10 @@ class _ProfileData {
       }
     }
 
-    // Phone resolution: prefer Supabase, then Firebase.
-    final phone = supabasePhone ?? _nonEmpty(user?.phoneNumber);
+    // Phone resolution: prefer Supabase profile, then Supabase auth, then Firebase.
+    final phone = supabasePhone ??
+        _nonEmpty(supabaseUser?.phone) ??
+        _nonEmpty(firebaseUser?.phoneNumber);
 
     return _ProfileData(
       displayName: resolvedName,
@@ -955,16 +1094,33 @@ class _AddPhoneSheetState extends State<_AddPhoneSheet> {
       _error = null;
     });
     try {
-      final user = firebase.FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Not signed in');
-      await Supabase.instance.client.from('profiles').upsert({
-        'firebase_uid': user.uid,
-        'phone': _controller.text.trim(),
-      }, onConflict: 'firebase_uid');
+      final fbUser = firebase.FirebaseAuth.instance.currentUser;
+      final suUser = Supabase.instance.client.auth.currentUser;
+      if (fbUser == null && suUser == null) throw Exception('Not signed in');
+      final phone = _controller.text.trim();
+
+      if (fbUser != null) {
+        await Supabase.instance.client.from('profiles').upsert({
+          'firebase_uid': fbUser.uid,
+          'phone': phone,
+        }, onConflict: 'firebase_uid').timeout(const Duration(seconds: 8));
+      }
+      if (suUser != null) {
+        try {
+          await Supabase.instance.client.from('profiles').upsert({
+            'id': suUser.id,
+            'phone': phone,
+          }, onConflict: 'id').timeout(const Duration(seconds: 8));
+        } catch (e) {
+          debugPrint('Supabase profile id phone upsert failed: $e');
+        }
+      }
+
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onSaved();
     } catch (e) {
+      debugPrint('Add phone failed: $e');
       if (!mounted) return;
       setState(() {
         _saving = false;
