@@ -10,7 +10,7 @@ import 'core/responsive/breakpoints.dart';
 import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
 import 'theme/app_colors.dart';
-import 'widgets/logout_dialog.dart';
+import 'widgets/app_menu_button.dart';
 
 const _cream = AppColors.cream;
 const _cardCream = AppColors.surface;
@@ -119,20 +119,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
             SliverToBoxAdapter(
               child: Builder(
                 builder: (context) => context.isMobile
-                    ? _HomeHeader(
-                        onMenuSelected: (item) {
-                          switch (item) {
-                            case 'About Atithi':
-                              context.push('/about');
-                            case 'Contact Us':
-                              context.push('/contact');
-                            case 'Our Services':
-                              context.push('/services');
-                            case 'Log out':
-                              showLogoutDialog(context);
-                          }
-                        },
-                      )
+                    ? const _HomeHeader()
                     : const SizedBox(height: 12),
               ),
             ),
@@ -209,9 +196,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
                 child: const PropertyAboutPreview(),
               ),
             ),
-            const SliverToBoxAdapter(
-              child: WhyChooseAtithiSection(),
-            ),
+            const SliverToBoxAdapter(child: WhyChooseAtithiSection()),
             SliverToBoxAdapter(
               child: _Section(
                 title: 'Contact Us',
@@ -233,8 +218,7 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.onMenuSelected});
-  final ValueChanged<String> onMenuSelected;
+  const _HomeHeader();
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -261,58 +245,8 @@ class _HomeHeader extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        PopupMenuButton<String>(
-          tooltip: 'Open menu',
-          onSelected: onMenuSelected,
-          color: _cardCream,
-          elevation: 6,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: _gold.withValues(alpha: 0.3)),
-          ),
-          icon: const _HamburgerIcon(),
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
-            PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
-            PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 'Log out',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: _navy, size: 18),
-                  SizedBox(width: 8),
-                  Text('Log out'),
-                ],
-              ),
-            ),
-          ],
-        ),
+        const AppMenuButton(),
       ],
-    ),
-  );
-}
-
-class _HamburgerIcon extends StatelessWidget {
-  const _HamburgerIcon();
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 24,
-    height: 16,
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(
-        3,
-        (_) => Container(
-          height: 2.2,
-          decoration: BoxDecoration(
-            color: _navy,
-            borderRadius: BorderRadius.circular(1.5),
-          ),
-        ),
-      ),
     ),
   );
 }

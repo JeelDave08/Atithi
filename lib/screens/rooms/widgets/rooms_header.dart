@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/responsive/breakpoints.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_menu_button.dart';
 import '../../../widgets/app_network_image.dart';
 
 class RoomsHeader extends StatelessWidget {
@@ -86,7 +87,7 @@ class RoomsHeader extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(width: 8),
-                      _circle(Icons.menu, () {}),
+                      const AppMenuButton(onDarkBackground: true),
                     ],
                   ),
                   SizedBox(height: context.isMobile ? 12 : 20),
