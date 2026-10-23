@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,9 +10,8 @@ import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
 
 const _cream = AppColors.cream;
-const _cardCream = AppColors.cream;
+const _cardCream = AppColors.surface;
 const _navy = AppColors.navy;
-const _primaryNavy = AppColors.navy;
 const _gold = AppColors.gold;
 const _lightGold = AppColors.gold;
 const _mainText = AppColors.navy;
@@ -27,7 +24,6 @@ class AtithiHomeScreen extends StatefulWidget {
 }
 
 class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
-  final ScrollController _homeScrollController = ScrollController();
   late DateTime _checkIn = _dateOnly(DateTime.now());
   late DateTime _checkOut = _dateOnly(DateTime.now())
       .add(const Duration(days: 1));
@@ -36,12 +32,6 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
 
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
-
-  @override
-  void dispose() {
-    _homeScrollController.dispose();
-    super.dispose();
-  }
 
   Future<void> _selectCheckIn() async {
     final today = _dateOnly(DateTime.now());
@@ -106,15 +96,6 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
     );
   }
 
-  void _openDestination(String title, String description) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            AtithiDestinationScreen(title: title, description: description),
-      ),
-    );
-  }
-
   void _changeCount({required bool adults, required int change}) {
     setState(() {
       if (adults) {
@@ -131,14 +112,9 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
     body: SafeArea(
       bottom: false,
       child: CustomScrollView(
-        controller: _homeScrollController,
         slivers: [
           SliverToBoxAdapter(
             child: _HomeHeader(
-              onNotifications: () => _openDestination(
-                'Notifications',
-                'You are all caught up. New updates about your Atithi stays will appear here.',
-              ),
               onMenuSelected: (item) {
                 switch (item) {
                   case 'About Atithi':
@@ -153,19 +129,30 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: _HeroBanner(
-                onTap: _openRoomListing,
-                scrollController: _homeScrollController,
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+              child: Text(
+                'More than just a stay',
+                style: GoogleFonts.playfairDisplay(
+                  color: _navy,
+                  fontSize: 29,
+                  height: 1.08,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: HeroSection(onTap: _openRoomListing),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               child: Transform.translate(
-                offset: const Offset(0, -28),
-                child: _BookingSearchCard(
+                offset: const Offset(0, -30),
+                child: BookingCard(
                   checkIn: _checkIn,
                   checkOut: _checkOut,
                   adults: _adults,
@@ -247,339 +234,107 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
         ],
       ),
     ),
-    bottomNavigationBar: const _HomeBottomNavigation(),
+    bottomNavigationBar: const BottomNav(),
   );
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.onNotifications,
-    required this.onMenuSelected,
-  });
-
-  final VoidCallback onNotifications;
+  const _HomeHeader({required this.onMenuSelected});
   final ValueChanged<String> onMenuSelected;
 
   @override
-  Widget build(BuildContext context) => RevealOnScroll(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(18, 10, 12, 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 124,
-            height: 48,
-            child: Image.asset(
-              'assets/images/atithi_logo.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => Text(
-                'ATITHI',
-                style: GoogleFonts.playfairDisplay(
-                  color: _navy,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w700,
-                ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 8, 14, 0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ATITHI',
+              style: GoogleFonts.playfairDisplay(
+                color: _navy,
+                fontSize: 31,
+                height: 1,
+                letterSpacing: 2.2,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-          const Spacer(),
-          _PulsingBell(onPressed: onNotifications),
-          PopupMenuButton<String>(
-            tooltip: 'Open menu',
-            onSelected: onMenuSelected,
-            color: _cardCream,
-            icon: const Icon(Icons.menu_rounded, color: _navy),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
-              PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
-              PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
-            ],
-          ),
-        ],
-      ),
+            const SizedBox(height: 7),
+            const _OrnamentDivider(),
+          ],
+        ),
+        const Spacer(),
+        PopupMenuButton<String>(
+          tooltip: 'Open menu',
+          onSelected: onMenuSelected,
+          color: _cardCream,
+          icon: const Icon(Icons.menu_rounded, color: _navy, size: 27),
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'About Atithi', child: Text('About Atithi')),
+            PopupMenuItem(value: 'Our Services', child: Text('Our Services')),
+            PopupMenuItem(value: 'Contact Us', child: Text('Contact Us')),
+          ],
+        ),
+      ],
     ),
   );
 }
 
-// Flutter-only doorway scene keeps animation assets and backend logic unchanged.
-class _HeroBanner extends StatefulWidget {
-  const _HeroBanner({required this.onTap, required this.scrollController});
-
-  final VoidCallback onTap;
-  final ScrollController scrollController;
+class _OrnamentDivider extends StatelessWidget {
+  const _OrnamentDivider();
 
   @override
-  State<_HeroBanner> createState() => _HeroBannerState();
+  Widget build(BuildContext context) => SizedBox(
+    width: 124,
+    child: Row(
+      children: [
+        Expanded(
+          child: Container(height: 1, color: _gold.withValues(alpha: .65)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          child: Transform.rotate(
+            angle: math.pi / 4,
+            child: Container(width: 7, height: 7, color: _gold),
+          ),
+        ),
+        Expanded(
+          child: Container(height: 1, color: _gold.withValues(alpha: .65)),
+        ),
+      ],
+    ),
+  );
 }
 
-class _HeroBannerState extends State<_HeroBanner>
-    with TickerProviderStateMixin {
-  late final AnimationController _intro = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  );
-  late final AnimationController _ambience = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 18),
-  )..repeat(reverse: true);
-  late final AnimationController _glow = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2500),
-  )..repeat(reverse: true);
-  bool _reducedMotion = false;
+class HeroSection extends StatelessWidget {
+  const HeroSection({super.key, required this.onTap});
+  final VoidCallback onTap;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final reduced = MediaQuery.disableAnimationsOf(context);
-    if (reduced != _reducedMotion) {
-      _reducedMotion = reduced;
-      if (reduced) {
-        _intro.value = 1;
-        _ambience.stop();
-        _glow.stop();
-      } else {
-        _intro.forward(from: 0);
-        _ambience.repeat(reverse: true);
-        _glow.repeat(reverse: true);
-      }
-    }
-    if (!_intro.isAnimating && _intro.value == 0 && !reduced) {
-      _intro.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _intro.dispose();
-    _ambience.dispose();
-    _glow.dispose();
-    super.dispose();
-  }
-
-  void _replay() {
-    if (_reducedMotion) return;
-    _intro.forward(from: 0);
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([
-      _intro,
-      _ambience,
-      _glow,
-      widget.scrollController,
-    ]),
-    builder: (context, _) {
-      final scroll =
-          !MediaQuery.disableAnimationsOf(context) &&
-              widget.scrollController.hasClients
-          ? widget.scrollController.offset
-          : 0.0;
-      final hour = DateTime.now().hour;
-      final greeting = hour >= 5 && hour < 12
-          ? 'Good Morning'
-          : hour >= 17 && hour < 21
-          ? 'Good Evening'
-          : 'Good Night';
-      final guestName = FirebaseAuth.instance.currentUser?.displayName
-          ?.trim()
-          .split(' ')
-          .first;
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(36),
-        child: SizedBox(
-          height: 440,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.navy,
-                      Color.lerp(_navy, _primaryNavy, _ambience.value)!,
-                      _primaryNavy,
-                    ],
-                  ),
-                ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final height = (constraints.maxWidth * .76)
+          .clamp(230.0, 360.0)
+          .toDouble();
+      return Semantics(
+        image: true,
+        label: 'Palace viewed through a heritage archway with a lantern and plants',
+        child: Material(
+          color: _cardCream,
+          borderRadius: BorderRadius.circular(26),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: height,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: const _HeritageArchPainter(),
+                child: const SizedBox.expand(),
               ),
-              Transform.translate(
-                offset: Offset(0, scroll * .08),
-                child: _HeroStars(opacity: .38 + _ambience.value * .3),
-              ),
-              Positioned(
-                bottom: 72,
-                left: 0,
-                right: 0,
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    size: const Size(170, 190),
-                    painter: _DoorwayPainter(glow: _glow.value),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: (38 + (math.sin(_ambience.value * math.pi) * 18))
-                    .toDouble(),
-                top: (35 + (math.cos(_ambience.value * math.pi) * 8))
-                    .toDouble(),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _cream,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _lightGold.withValues(alpha: .42),
-                        blurRadius: 28,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Transform.translate(
-                  offset: Offset(0, scroll * .2),
-                  child: const _HeroSkyline(),
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0xD90B2347), Color(0x000B2347)],
-                    stops: [0, .78],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 58, 22, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      guestName == null || guestName.isEmpty
-                          ? '$greeting, Guest'
-                          : 'Namaste, $guestName',
-                      style: const TextStyle(
-                        color: _lightGold,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Atithi Devo Bhava',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.playfairDisplay(
-                        color: Colors.white,
-                        fontSize: 38,
-                        fontWeight: FontWeight.w600,
-                        height: 1.08,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      'Where every guest is family.',
-                      style: TextStyle(
-                        color: _lightGold,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const _RotatingHeroLine(),
-                    const SizedBox(height: 14),
-                    Material(
-                      color: _lightGold,
-                      borderRadius: BorderRadius.circular(20),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: widget.onTap,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 9,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Find your stay',
-                                style: TextStyle(
-                                  color: _navy,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Transform.translate(
-                                offset: Offset(_glow.value * 3, 0),
-                                child: const Icon(
-                                  Icons.arrow_forward_rounded,
-                                  color: _navy,
-                                  size: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _intro,
-                    builder: (context, _) => Row(
-                      children: [
-                        Expanded(
-                          child: Transform.translate(
-                            offset: Offset(
-                              -MediaQuery.sizeOf(context).width *
-                                  .5 *
-                                  _intro.value,
-                              0,
-                            ),
-                            child: const _HeroDoor(isLeft: true),
-                          ),
-                        ),
-                        Expanded(
-                          child: Transform.translate(
-                            offset: Offset(
-                              MediaQuery.sizeOf(context).width *
-                                  .5 *
-                                  _intro.value,
-                              0,
-                            ),
-                            child: const _HeroDoor(isLeft: false),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 10,
-                bottom: 8,
-                child: IconButton(
-                  onPressed: _replay,
-                  tooltip: 'Tap to replay',
-                  icon: const Icon(Icons.replay_rounded, size: 18),
-                  style: IconButton.styleFrom(foregroundColor: _lightGold),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );
@@ -587,106 +342,229 @@ class _HeroBannerState extends State<_HeroBanner>
   );
 }
 
-class _HeroDoor extends StatelessWidget {
-  const _HeroDoor({required this.isLeft});
-  final bool isLeft;
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
-        end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
-        colors: const [_navy, _primaryNavy],
-      ),
-      border: Border.all(color: _lightGold.withValues(alpha: .5), width: 1.2),
-    ),
-    child: Center(
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: _lightGold,
-          shape: BoxShape.circle,
-        ),
-      ),
-    ),
-  );
-}
-
-class _DoorwayPainter extends CustomPainter {
-  const _DoorwayPainter({required this.glow});
-  final double glow;
+class _HeritageArchPainter extends CustomPainter {
+  const _HeritageArchPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
     final arch = Path()
-      ..moveTo(size.width * .18, size.height)
-      ..lineTo(size.width * .18, size.height * .45)
-      ..cubicTo(
-        size.width * .18,
-        size.height * .06,
-        size.width * .82,
-        size.height * .06,
-        size.width * .82,
-        size.height * .45,
-      )
-      ..lineTo(size.width * .82, size.height)
+      ..moveTo(w * .11, h)
+      ..lineTo(w * .11, h * .42)
+      ..cubicTo(w * .11, h * .12, w * .89, h * .12, w * .89, h * .42)
+      ..lineTo(w * .89, h)
       ..close();
-    final haze = Paint()
-      ..color = _gold.withValues(alpha: .11 + glow * .12)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 + glow * 10);
-    canvas.drawPath(arch, haze);
-    final fill = Paint()
+    final outer = Paint()..color = _navy;
+    canvas.drawPath(arch, outer);
+    final innerArch = Path()
+      ..moveTo(w * .16, h)
+      ..lineTo(w * .16, h * .43)
+      ..cubicTo(w * .16, h * .17, w * .84, h * .17, w * .84, h * .43)
+      ..lineTo(w * .84, h)
+      ..close();
+    canvas.drawPath(innerArch, Paint()..color = const Color(0xFFF0DFBD));
+
+    canvas.save();
+    canvas.clipPath(innerArch);
+    final sky = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [_gold, _gold, _navy],
+        colors: [_cardCream, Color(0xFFE8D6AE)],
       ).createShader(Offset.zero & size);
-    canvas.drawPath(arch, fill);
-    final frame = Paint()
+    canvas.drawRect(Offset.zero & size, sky);
+    final distantHills = Path()
+      ..moveTo(w * .14, h * .76)
+      ..quadraticBezierTo(w * .36, h * .44, w * .57, h * .7)
+      ..quadraticBezierTo(w * .73, h * .5, w * .87, h * .73)
+      ..lineTo(w * .87, h)
+      ..lineTo(w * .14, h)
+      ..close();
+    canvas.drawPath(
+      distantHills,
+      Paint()..color = _gold.withValues(alpha: .58),
+    );
+    final hills = Path()
+      ..moveTo(w * .14, h * .83)
+      ..quadraticBezierTo(w * .36, h * .61, w * .57, h * .81)
+      ..quadraticBezierTo(w * .75, h * .63, w * .87, h * .8)
+      ..lineTo(w * .87, h)
+      ..lineTo(w * .14, h)
+      ..close();
+    canvas.drawPath(hills, Paint()..color = _navy.withValues(alpha: .75));
+    _drawPalace(canvas, w, h);
+    canvas.restore();
+
+    final trim = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = _gold.withValues(alpha: .75 + glow * .25);
-    canvas.drawPath(arch, frame);
-    final seam = Paint()
-      ..color = _navy.withValues(alpha: .45)
-      ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(size.width * .5, size.height * .48),
-      Offset(size.width * .5, size.height),
-      seam,
+      ..strokeWidth = 4
+      ..color = _gold;
+    canvas.drawPath(arch, trim);
+    final innerTrim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = _cardCream.withValues(alpha: .8);
+    canvas.drawPath(innerArch, innerTrim);
+    _drawLantern(canvas, w * .16, h * .49, math.min(w, h) * .095);
+    _drawPlant(canvas, w * .24, h * .92, math.min(w, h) * .19);
+    _drawBananaLeaves(canvas, w * .12, h * .94, math.min(w, h) * .26);
+  }
+
+  void _drawPalace(Canvas canvas, double w, double h) {
+    final palace = Paint()..color = _navy;
+    final gold = Paint()..color = _gold;
+    final baseY = h * .77;
+    canvas.drawRect(Rect.fromLTWH(w * .39, h * .58, w * .24, h * .19), palace);
+    canvas.drawRect(Rect.fromLTWH(w * .34, h * .67, w * .34, h * .1), gold);
+    canvas.drawRect(Rect.fromLTWH(w * .37, h * .69, w * .28, h * .08), palace);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * .44, h * .49, w * .14, h * .1),
+        const Radius.circular(24),
+      ),
+      palace,
+    );
+    canvas.drawCircle(Offset(w * .51, h * .49), w * .055, gold);
+    canvas.drawRect(Rect.fromLTWH(w * .47, h * .51, w * .08, h * .1), palace);
+    for (final x in [w * .41, w * .48, w * .55, w * .61]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, h * .61, w * .025, h * .045),
+          const Radius.circular(4),
+        ),
+        Paint()..color = _gold,
+      );
+    }
+    canvas.drawRect(
+      Rect.fromLTWH(w * .45, baseY - h * .045, w * .12, h * .045),
+      gold,
     );
   }
 
-  @override
-  bool shouldRepaint(covariant _DoorwayPainter oldDelegate) =>
-      oldDelegate.glow != glow;
-}
+  void _drawLantern(Canvas canvas, double x, double y, double radius) {
+    final glow = Paint()..color = _gold.withValues(alpha: .24);
+    canvas.drawCircle(Offset(x, y), radius * .95, glow);
+    final metal = Paint()
+      ..color = _navy
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawLine(
+      Offset(x, y - radius * 1.5),
+      Offset(x, y - radius * .65),
+      metal,
+    );
+    final body = Rect.fromCenter(
+      center: Offset(x, y),
+      width: radius,
+      height: radius * 1.45,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(body, const Radius.circular(4)),
+      metal,
+    );
+    canvas.drawLine(
+      Offset(body.left + 4, body.top + 3),
+      Offset(body.left + 4, body.bottom - 3),
+      metal,
+    );
+    canvas.drawLine(
+      Offset(body.right - 4, body.top + 3),
+      Offset(body.right - 4, body.bottom - 3),
+      metal,
+    );
+    canvas.drawRect(body.deflate(radius * .18), Paint()..color = _gold);
+    canvas.drawLine(
+      Offset(x - radius * .65, body.top),
+      Offset(x + radius * .65, body.top),
+      metal,
+    );
+    canvas.drawLine(
+      Offset(x - radius * .65, body.bottom),
+      Offset(x + radius * .65, body.bottom),
+      metal,
+    );
+  }
 
-class _HeroStars extends StatelessWidget {
-  const _HeroStars({required this.opacity});
-  final double opacity;
+  void _drawPlant(Canvas canvas, double x, double y, double scale) {
+    final leaf = Paint()..color = _navy;
+    canvas.drawLine(
+      Offset(x, y - scale * .2),
+      Offset(x, y - scale),
+      Paint()
+        ..color = _gold
+        ..strokeWidth = 2,
+    );
+    for (var i = 0; i < 5; i++) {
+      final direction = i - 2;
+      final path = Path()
+        ..moveTo(x, y - scale * .34)
+        ..quadraticBezierTo(
+          x + direction * scale * .18,
+          y - scale * .78,
+          x + direction * scale * .28,
+          y - scale * (1.15 - direction.abs() * .1),
+        )
+        ..quadraticBezierTo(
+          x + direction * scale * .09,
+          y - scale * .67,
+          x,
+          y - scale * .34,
+        )
+        ..close();
+      canvas.drawPath(path, leaf);
+    }
+    final pot = Path()
+      ..moveTo(x - scale * .38, y - scale * .22)
+      ..lineTo(x + scale * .38, y - scale * .22)
+      ..lineTo(x + scale * .28, y + scale * .3)
+      ..lineTo(x - scale * .28, y + scale * .3)
+      ..close();
+    canvas.drawPath(pot, Paint()..color = _gold);
+    canvas.drawLine(
+      Offset(x - scale * .38, y - scale * .22),
+      Offset(x + scale * .38, y - scale * .22),
+      Paint()
+        ..color = _navy
+        ..strokeWidth = 3,
+    );
+  }
+
+  void _drawBananaLeaves(Canvas canvas, double x, double y, double scale) {
+    for (var i = 0; i < 5; i++) {
+      final angle = -1.15 + i * .48;
+      final end = Offset(
+        x + math.cos(angle) * scale,
+        y + math.sin(angle) * scale,
+      );
+      final path = Path()
+        ..moveTo(x, y)
+        ..quadraticBezierTo(
+          x + math.cos(angle - .35) * scale * .6,
+          y + math.sin(angle - .35) * scale * .6,
+          end.dx,
+          end.dy,
+        )
+        ..quadraticBezierTo(
+          x + math.cos(angle + .3) * scale * .5,
+          y + math.sin(angle + .3) * scale * .5,
+          x,
+          y,
+        )
+        ..close();
+      canvas.drawPath(path, Paint()..color = i.isEven ? _navy : _gold);
+      canvas.drawLine(
+        Offset(x, y),
+        end,
+        Paint()
+          ..color = _cardCream.withValues(alpha: .6)
+          ..strokeWidth = 1,
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: Stack(
-      children: List.generate(50, (i) {
-        final x = ((i * 47 + 13) % 97) / 100;
-        final y = ((i * 31 + 9) % 48) / 100;
-        return Positioned(
-          left: MediaQuery.sizeOf(context).width * x,
-          top: 440 * y,
-          child: Opacity(
-            opacity: opacity * (.55 + (i % 4) * .1),
-            child: Icon(
-              Icons.circle,
-              size: i % 6 == 0 ? 3 : 2,
-              color: _lightGold,
-            ),
-          ),
-        );
-      }),
-    ),
-  );
+  bool shouldRepaint(covariant _HeritageArchPainter oldDelegate) => false;
 }
 
 class _TrustStrip extends StatelessWidget {
@@ -781,138 +659,9 @@ class _TrustItem extends StatelessWidget {
   );
 }
 
-class _HeroSkyline extends StatelessWidget {
-  const _HeroSkyline();
-  static const List<double> _heights = [56, 88, 70, 108, 82, 62, 96, 58];
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.bottomCenter,
-    child: SizedBox(
-      height: 125,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(
-          _heights.length,
-          (i) => Expanded(
-            child: Container(
-              height: _heights[i],
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                color: _navy.withValues(alpha: .9),
-                border: i == 3
-                    ? Border.all(
-                        color: _gold.withValues(alpha: .75),
-                        width: 1.3,
-                      )
-                    : null,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(5),
-                ),
-              ),
-              child: i == 3
-                  ? Column(
-                      children: [
-                        const SizedBox(height: 5),
-                        Text(
-                          'ATITHI',
-                          style: TextStyle(
-                            color: _lightGold,
-                            fontSize: 7,
-                            letterSpacing: 1,
-                            shadows: [Shadow(color: _gold, blurRadius: 8)],
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          width: 18,
-                          height: 25,
-                          decoration: BoxDecoration(
-                            color: _gold.withValues(alpha: .5),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.all(5),
-                      child: Wrap(
-                        spacing: 5,
-                        runSpacing: 5,
-                        children: List.generate(
-                          4,
-                          (_) => Container(
-                            width: 5,
-                            height: 7,
-                            color: _gold.withValues(alpha: .55),
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _RotatingHeroLine extends StatefulWidget {
-  const _RotatingHeroLine();
-  @override
-  State<_RotatingHeroLine> createState() => _RotatingHeroLineState();
-}
-
-class _RotatingHeroLineState extends State<_RotatingHeroLine> {
-  static const _words = [
-    'comfortable rooms',
-    'friendly service',
-    'a relaxing stay',
-    'warm hospitality',
-  ];
-  int _index = 0;
-  Timer? _timer;
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
-      if (mounted && !MediaQuery.disableAnimationsOf(context)) {
-        setState(() => _index = (_index + 1) % _words.length);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: const Duration(milliseconds: 350),
-    transitionBuilder: (child, animation) => SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, .25),
-        end: Offset.zero,
-      ).animate(animation),
-      child: FadeTransition(opacity: animation, child: child),
-    ),
-    child: Text(
-      'Enjoy ${_words[_index]}',
-      key: ValueKey(_index),
-      style: const TextStyle(
-        color: _lightGold,
-        fontWeight: FontWeight.w600,
-        fontSize: 15,
-      ),
-    ),
-  );
-}
-
-class _BookingSearchCard extends StatelessWidget {
-  const _BookingSearchCard({
+class BookingCard extends StatelessWidget {
+  const BookingCard({
+    super.key,
     required this.checkIn,
     required this.checkOut,
     required this.adults,
@@ -935,124 +684,94 @@ class _BookingSearchCard extends StatelessWidget {
   final VoidCallback onSearch;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: _cardCream,
-      borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: _gold.withValues(alpha: .32)),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x140F2943),
-          blurRadius: 18,
-          offset: Offset(0, 8),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 370;
+      return Container(
+        padding: EdgeInsets.all(compact ? 13 : 16),
+        decoration: BoxDecoration(
+          color: _cardCream,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _gold.withValues(alpha: .35)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A0B1F3A),
+              blurRadius: 22,
+              offset: Offset(0, 9),
+            ),
+          ],
         ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: _navy,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'KEY CARD',
-                      style: TextStyle(
-                        color: _lightGold,
-                        fontSize: 10,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      'Plan your stay',
-                      style: GoogleFonts.playfairDisplay(
-                        color: Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _DateChoice(
+                    label: 'Check-in',
+                    date: checkIn,
+                    onTap: onCheckInTap,
+                    compact: compact,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(horizontal: 7),
+                  color: _gold.withValues(alpha: .35),
+                ),
+                Expanded(
+                  child: _DateChoice(
+                    label: 'Check-out',
+                    date: checkOut,
+                    onTap: onCheckOutTap,
+                    compact: compact,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: GuestStepper(
+                    label: 'Adults',
+                    count: adults,
+                    icon: Icons.person_outline_rounded,
+                    onChanged: onAdultsChange,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GuestStepper(
+                    label: 'Children',
+                    count: children,
+                    icon: Icons.child_care_outlined,
+                    onChanged: onChildrenChange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: onSearch,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _navy,
+                  foregroundColor: _cream,
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'Find a stay  →',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
-              const Icon(Icons.nfc_rounded, color: _lightGold, size: 27),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: _DateChoice(
-                label: 'Check-in',
-                date: checkIn,
-                onTap: onCheckInTap,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _DateChoice(
-                label: 'Check-out',
-                date: checkOut,
-                onTap: onCheckOutTap,
-              ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _GuestCounter(
-                label: 'Adults',
-                count: adults,
-                icon: Icons.person_outline_rounded,
-                onChanged: onAdultsChange,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _GuestCounter(
-                label: 'Children',
-                count: children,
-                icon: Icons.child_care_outlined,
-                onChanged: onChildrenChange,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: FilledButton.icon(
-            onPressed: onSearch,
-            style: FilledButton.styleFrom(
-              backgroundColor: _gold,
-              foregroundColor: _navy,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-            ),
-            icon: const Icon(Icons.search_rounded),
-            label: const Text(
-              'Search',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-          ),
-        ),
-      ],
-    ),
+      );
+    },
   );
 }
 
@@ -1061,32 +780,42 @@ class _DateChoice extends StatelessWidget {
     required this.label,
     required this.date,
     required this.onTap,
+    required this.compact,
   });
 
   final String label;
   final DateTime date;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: _cream,
-    borderRadius: BorderRadius.circular(14),
+    color: Colors.transparent,
     child: InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8, vertical: 8),
         child: Row(
           children: [
-            const Icon(Icons.calendar_month_outlined, color: _gold, size: 21),
-            const SizedBox(width: 8),
+            const Icon(
+              Icons.calendar_month_outlined,
+              color: _navy,
+              size: 20,
+            ),
+            const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(color: _primaryNavy, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 10,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -1094,8 +823,8 @@ class _DateChoice extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: _mainText,
-                      fontSize: 14,
+                      color: _navy,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1109,8 +838,9 @@ class _DateChoice extends StatelessWidget {
   );
 }
 
-class _GuestCounter extends StatelessWidget {
-  const _GuestCounter({
+class GuestStepper extends StatelessWidget {
+  const GuestStepper({
+    super.key,
     required this.label,
     required this.count,
     required this.icon,
@@ -1123,74 +853,74 @@ class _GuestCounter extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-    decoration: BoxDecoration(
-      color: _cream,
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: _gold, size: 20),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(color: _primaryNavy, fontSize: 11),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: _gold, size: 19),
+      const SizedBox(width: 5),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 11,
               ),
-              Text(
-                '$count',
-                style: const TextStyle(
-                  color: _mainText,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+            ),
+            Text(
+              '$count',
+              style: const TextStyle(
+                color: _navy,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        _CounterButton(
-          icon: Icons.remove,
-          onTap: () => onChanged(-1),
-          tooltip: 'Decrease $label',
-        ),
-        const SizedBox(width: 4),
-        _CounterButton(
-          icon: Icons.add,
-          onTap: () => onChanged(1),
-          tooltip: 'Increase $label',
-        ),
-      ],
-    ),
+      ),
+      _CounterButton(
+        icon: Icons.remove,
+        tooltip: 'Decrease $label',
+        onTap: () => onChanged(-1),
+      ),
+      const SizedBox(width: 4),
+      _CounterButton(
+        icon: Icons.add,
+        tooltip: 'Increase $label',
+        onTap: () => onChanged(1),
+      ),
+    ],
   );
 }
 
 class _CounterButton extends StatelessWidget {
   const _CounterButton({
     required this.icon,
-    required this.onTap,
     required this.tooltip,
+    required this.onTap,
   });
 
   final IconData icon;
-  final VoidCallback onTap;
   final String tooltip;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 27,
-    height: 29,
+    width: 32,
+    height: 32,
     child: IconButton(
-      padding: EdgeInsets.zero,
-      tooltip: tooltip,
       onPressed: onTap,
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
       icon: Icon(icon, size: 16, color: _navy),
       style: IconButton.styleFrom(
-        backgroundColor: _lightGold.withValues(alpha: .35),
-        minimumSize: const Size(27, 29),
+        backgroundColor: _gold.withValues(alpha: .24),
+        shape: const CircleBorder(),
+        minimumSize: const Size(32, 32),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     ),
@@ -1442,69 +1172,8 @@ class _ContactCard extends StatelessWidget {
   );
 }
 
-class _PulsingBell extends StatefulWidget {
-  const _PulsingBell({required this.onPressed});
-  final VoidCallback onPressed;
-  @override
-  State<_PulsingBell> createState() => _PulsingBellState();
-}
-
-class _PulsingBellState extends State<_PulsingBell>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..repeat(reverse: true);
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _pulse.stop();
-    } else if (!_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: 'Notifications',
-    onPressed: widget.onPressed,
-    icon: AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, _) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Transform.rotate(
-            angle: math.sin(_pulse.value * math.pi * 2) * .08,
-            child: const Icon(Icons.notifications_none_rounded, color: _navy),
-          ),
-          Positioned(
-            right: -1,
-            top: -1,
-            child: Container(
-              width: 8 + _pulse.value * 2,
-              height: 8 + _pulse.value * 2,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _gold,
-                border: Border.all(color: _cardCream, width: 1),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _HomeBottomNavigation extends StatelessWidget {
-  const _HomeBottomNavigation();
+class BottomNav extends StatelessWidget {
+  const BottomNav({super.key});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1527,25 +1196,25 @@ class _HomeBottomNavigation extends StatelessWidget {
         child: Row(
           children: [
             _NavItem(
-              icon: Icons.home_outlined,
+              icon: Icons.home_rounded,
               label: 'Home',
               selected: true,
-              onTap: () {},
+              onTap: () => context.go('/home'),
             ),
             _NavItem(
               icon: Icons.bed_outlined,
               label: 'Rooms',
-              onTap: () => context.push('/rooms'),
+              onTap: () => context.go('/rooms'),
             ),
             _NavItem(
               icon: Icons.event_note_outlined,
               label: 'Bookings',
-              onTap: () => context.push('/bookings'),
+              onTap: () => context.go('/bookings'),
             ),
             _NavItem(
               icon: Icons.person_outline_rounded,
               label: 'Profile',
-              onTap: () => context.push('/profile'),
+              onTap: () => context.go('/profile'),
             ),
           ],
         ),
@@ -1572,20 +1241,14 @@ class _NavItem extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
-              decoration: BoxDecoration(
-                color: selected
-                    ? _lightGold.withValues(alpha: .6)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(icon, color: _navy, size: 21),
+            Icon(
+              icon,
+              color: _navy,
+              size: 21,
             ),
             const SizedBox(height: 2),
             Text(
@@ -1594,6 +1257,16 @@ class _NavItem extends StatelessWidget {
                 color: _navy,
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: selected ? 20 : 0,
+              height: 2,
+              decoration: BoxDecoration(
+                color: selected ? _gold : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ],

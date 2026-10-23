@@ -17,7 +17,7 @@ import 'models/room.dart';
 import 'theme/app_colors.dart';
 
 const _experienceCream = AppColors.cream;
-const _experienceCard = AppColors.cream;
+const _experienceCard = AppColors.surface;
 const _experienceNavy = AppColors.navy;
 const _experienceGold = AppColors.gold;
 const _experienceLightGold = AppColors.gold;
@@ -546,7 +546,7 @@ class _AboutContentState extends State<_AboutContent>
                 ? 'Property introduction is not available yet.'
                 : widget.property.description,
             style: GoogleFonts.dmSans(
-              color: const Color(0xFF4A4F5C),
+              color: AppColors.secondaryText,
               height: 1.65,
               fontSize: 15,
             ),
@@ -896,7 +896,7 @@ class _StatCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.dmSans(
-            color: const Color(0xFF4A4F5C),
+            color: AppColors.secondaryText,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -1110,7 +1110,7 @@ class _ServicesOrbitState extends State<ServicesOrbit>
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.dmSans(
-                                    color: const Color(0xFF4A4F5C),
+                                    color: AppColors.secondaryText,
                                     fontSize: 10,
                                     height: 1.25,
                                   ),
@@ -1768,7 +1768,7 @@ class PropertyRoomDetailsScreen extends StatelessWidget {
           room.description.isEmpty
               ? 'A comfortable room for your stay.'
               : room.description,
-          style: const TextStyle(color: Color(0xFF4A4F5C), height: 1.55),
+          style: const TextStyle(color: AppColors.secondaryText, height: 1.55),
         ),
         const SizedBox(height: 14),
         Text(
@@ -1781,7 +1781,7 @@ class PropertyRoomDetailsScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Availability: ${room.availability.isEmpty ? 'Not specified' : room.availability}',
-          style: const TextStyle(color: Color(0xFF4A4F5C)),
+          style: const TextStyle(color: AppColors.secondaryText),
         ),
         if (room.amenities.isNotEmpty) ...[
           const SizedBox(height: 20),
@@ -2124,24 +2124,30 @@ class PropertyRoomsPreview extends StatelessWidget {
         if (rooms.isEmpty) {
           return const _InlineDataState(text: 'No rooms are available yet.');
         }
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final room in rooms.take(5))
-                SizedBox(
-                  width: 280,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: RepaintBoundary(
-                      child: _RoomCard(room: PropertyRoom.fromRoom(room)),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth =
+                constraints.maxWidth * (constraints.maxWidth > 700 ? .42 : .88);
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final room in rooms.take(5))
+                    SizedBox(
+                      width: cardWidth,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: RepaintBoundary(
+                          child: _RoomCard(room: PropertyRoom.fromRoom(room)),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-            ],
-          ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -2170,98 +2176,60 @@ class PropertyServicesPreview extends StatelessWidget {
   }
 }
 
-class _HomeServicesMarquee extends StatefulWidget {
+class _HomeServicesMarquee extends StatelessWidget {
   const _HomeServicesMarquee({required this.services});
   final List<PropertyService> services;
 
   @override
-  State<_HomeServicesMarquee> createState() => _HomeServicesMarqueeState();
-}
-
-class _HomeServicesMarqueeState extends State<_HomeServicesMarquee>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 28),
-  );
-  bool _paused = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.stop();
-    } else if (!_paused && !_controller.isAnimating) {
-      _controller.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final first = widget.services
-        .take((widget.services.length + 1) ~/ 2)
-        .toList();
-    final second = widget.services.skip(first.length).toList();
-    return RepaintBoundary(
-      child: GestureDetector(
-        onPanDown: (_) {
-          _paused = true;
-          _controller.stop();
+    final chipWidth = (MediaQuery.sizeOf(context).width * .58)
+        .clamp(150.0, 230.0)
+        .toDouble();
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: services.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 9),
+        itemBuilder: (context, index) {
+          final service = services[index];
+          return Container(
+            width: chipWidth,
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: _experienceCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.gold.withValues(alpha: .35)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _serviceIcon(service.iconName),
+                  color: _experienceGold,
+                  size: 19,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    service.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _experienceNavy,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
         },
-        onPanEnd: (_) {
-          _paused = false;
-          if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
-        },
-        child: Column(
-          children: [
-            _marqueeRow(first, reverse: false),
-            const SizedBox(height: 7),
-            _marqueeRow(second.isEmpty ? first : second, reverse: true),
-          ],
-        ),
       ),
     );
   }
-
-  Widget _marqueeRow(List<PropertyService> values, {required bool reverse}) =>
-      ClipRect(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final distance = _controller.value * 180;
-            final offset = reverse ? -distance : distance;
-            return Transform.translate(
-              offset: Offset(offset, 0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var pass = 0; pass < 2; pass++)
-                    for (final service in values)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 9),
-                        child: Chip(
-                          avatar: Icon(
-                            _serviceIcon(service.iconName),
-                            color: _experienceNavy,
-                            size: 18,
-                          ),
-                          label: Text(service.name),
-                          backgroundColor: _experienceCard,
-                          side: const BorderSide(color: _experienceLightGold),
-                        ),
-                      ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
 }
 
 class PropertyAboutPreview extends StatelessWidget {
@@ -2287,17 +2255,21 @@ class PropertyAboutPreview extends StatelessWidget {
             color: _experienceCard,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: _experienceLightGold.withValues(alpha: .65),
+              color: _experienceLightGold.withValues(alpha: .35),
             ),
           ),
           child: Column(
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.hotel_class_outlined,
-                    color: _experienceGold,
-                    size: 27,
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(
+                      Icons.hotel_class_outlined,
+                      color: _experienceGold,
+                      size: 27,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2305,9 +2277,9 @@ class PropertyAboutPreview extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (property.name.isNotEmpty)
-                          const Text(
-                            'Atithi',
-                            style: TextStyle(
+                          Text(
+                            property.name,
+                            style: const TextStyle(
                               color: _experienceNavy,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2318,8 +2290,7 @@ class PropertyAboutPreview extends StatelessWidget {
                           text.isNotEmpty
                               ? text
                               : 'About details are not available yet.',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
                           style: const TextStyle(
                             color: _experienceNavy,
                             height: 1.45,
@@ -2517,7 +2488,7 @@ class _RoomCard extends StatelessWidget {
           '${room.type.isEmpty ? 'Room' : room.type} · ${room.capacity} guests',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Color(0xFF4A4F5C), fontSize: 13),
+          style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
         ),
         if (room.description.isNotEmpty) ...[
           const SizedBox(height: 5),
@@ -2526,7 +2497,7 @@ class _RoomCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Color(0xFF4A4F5C),
+              color: AppColors.secondaryText,
               fontSize: 12,
               height: 1.35,
             ),
@@ -2574,7 +2545,15 @@ class _RoomCard extends StatelessWidget {
                     builder: (_) => PropertyRoomDetailsScreen(room: room),
                   ),
                 ),
-                child: const Text('View Details'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('View Details', maxLines: 1, softWrap: false),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -2584,8 +2563,14 @@ class _RoomCard extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: _experienceNavy,
                   foregroundColor: _experienceCream,
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Book Now'),
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Book Now', maxLines: 1, softWrap: false),
+                ),
               ),
             ),
           ],
@@ -2600,7 +2585,7 @@ class _PropertyAvailabilityBadge extends StatelessWidget {
   final bool available;
   @override
   Widget build(BuildContext context) {
-    final color = available ? const Color(0xFF25804B) : const Color(0xFFB53838);
+    final color = available ? AppColors.navy : AppColors.gold;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -2905,7 +2890,7 @@ class _PageState extends StatelessWidget {
               diagnostic!,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF4A4F5C),
+                color: AppColors.secondaryText,
                 fontSize: 12,
                 height: 1.3,
               ),
@@ -2948,7 +2933,7 @@ class _InlineDataState extends StatelessWidget {
           SelectableText(
             diagnostic!,
             style: const TextStyle(
-              color: Color(0xFF4A4F5C),
+              color: AppColors.secondaryText,
               fontSize: 12,
               height: 1.3,
             ),
@@ -3063,7 +3048,7 @@ class _InfoSection extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           body,
-          style: const TextStyle(color: Color(0xFF4A4F5C), height: 1.55),
+          style: const TextStyle(color: AppColors.secondaryText, height: 1.55),
         ),
       ],
     ),
@@ -3286,7 +3271,10 @@ class _ServiceCard extends StatelessWidget {
               const SizedBox(height: 5),
               Text(
                 service.description,
-                style: const TextStyle(color: Color(0xFF4A4F5C), height: 1.45),
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  height: 1.45,
+                ),
               ),
             ],
           ),
@@ -3380,7 +3368,10 @@ class _ContactDetail extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
-      subtitle: Text(value, style: const TextStyle(color: Color(0xFF4A4F5C))),
+      subtitle: Text(
+        value,
+        style: const TextStyle(color: AppColors.secondaryText),
+      ),
       trailing: onTap == null
           ? null
           : const Icon(Icons.open_in_new, size: 17, color: _experienceNavy),

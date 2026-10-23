@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const navy = Color(0xFF0B2347);
-  static const gold = Color(0xFFDFB96F);
-  static const darkGold = Color(0xFFB8892B);
-  static const cream = Color(0xFFFAF5EA);
-  static const greyText = Color(0xFF6B7A8D);
-  static const muted = Color(0xFFBAC5D6);
-  static const border = Color(0x33E0BC73);
+  static const navy = Color(0xFF10284B);
+  static const gold = Color(0xFFD9B15F);
+  static const darkGold = gold;
+  static const cream = Color(0xFFF8F2E5);
+  static const surface = Color(0xFFFFFDF7);
+  static const secondaryText = Color(0xFF6D716F);
+  static const greyText = secondaryText;
+  static const muted = Color(0xFF6D716F);
+  static const border = Color(0x59D9B15F);
 }
