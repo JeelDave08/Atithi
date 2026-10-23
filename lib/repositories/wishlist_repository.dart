@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,13 +12,16 @@ class WishlistRepository {
 
   final SupabaseClient _client;
 
-  String? get currentUserId => _client.auth.currentUser?.id;
-  bool get hasSession => _client.auth.currentSession != null;
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
 
   Future<Set<String>> fetchWishlistRoomIds() async {
     try {
-      if (currentUserId == null) return {};
-      final rows = await _client.from('wishlists').select('room_id');
+      final uid = currentUserId;
+      if (uid == null) return {};
+      final rows = await _client
+          .from('wishlists')
+          .select('room_id')
+          .eq('user_id', uid);
       return rows.map((row) => row['room_id'].toString()).toSet();
     } catch (error) {
       _logError('fetch ids', error);
@@ -27,12 +31,12 @@ class WishlistRepository {
 
   Future<void> add(String roomId) async {
     try {
-      final user = _client.auth.currentUser;
-      if (user == null) throw StateError('Please sign in to save rooms.');
+      final uid = currentUserId;
+      if (uid == null) throw StateError('Please sign in to save rooms.');
       await _client
           .from('wishlists')
           .upsert(
-            {'user_id': user.id, 'room_id': roomId},
+            {'user_id': uid, 'room_id': roomId},
             onConflict: 'user_id,room_id',
             ignoreDuplicates: true,
           );
@@ -44,12 +48,12 @@ class WishlistRepository {
 
   Future<void> remove(String roomId) async {
     try {
-      final user = _client.auth.currentUser;
-      if (user == null) throw StateError('Please sign in to save rooms.');
+      final uid = currentUserId;
+      if (uid == null) throw StateError('Please sign in to save rooms.');
       await _client
           .from('wishlists')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', uid)
           .eq('room_id', roomId);
     } catch (error) {
       _logError('remove room $roomId', error);
@@ -65,6 +69,7 @@ class WishlistRepository {
         rows = await _client
             .from('wishlists')
             .select('created_at, rooms(*)')
+            .eq('user_id', currentUserId!)
             .order('created_at', ascending: false);
       } on PostgrestException catch (error) {
         _logError('fetch joined rooms; retrying by ids', error);
@@ -101,7 +106,7 @@ class WishlistRepository {
 
   void _logError(String operation, Object error) {
     if (!kDebugMode) return;
-    debugPrint('WISHLIST ERROR ($operation): $error');
+    debugPrint('WISHLIST ERROR: $error ($operation)');
     if (error is PostgrestException) {
       debugPrint(
         'code=${error.code} msg=${error.message} details=${error.details}',

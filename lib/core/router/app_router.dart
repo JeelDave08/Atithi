@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../auth/auth_repository.dart';
 import '../../features/availability/availability_screen.dart';
@@ -29,10 +28,7 @@ final propertyRepositoryProvider = Provider<PropertyRepository>(
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authRepositoryProvider);
-  final refresh = _AuthRefreshListenable(
-    auth.authStateChanges(),
-    Supabase.instance.client.auth.onAuthStateChange,
-  );
+  final refresh = _AuthRefreshListenable(auth.authStateChanges());
   ref.onDispose(refresh.dispose);
   final router = GoRouter(
     initialLocation: '/splash',
@@ -140,18 +136,13 @@ final routerProvider = Provider<GoRouter>((ref) {
 });
 
 class _AuthRefreshListenable extends ChangeNotifier {
-  _AuthRefreshListenable(Stream<dynamic> firebase, Stream<dynamic> supabase) {
-    _subscriptions = [
-      firebase.listen((_) => notifyListeners()),
-      supabase.listen((_) => notifyListeners()),
-    ];
+  _AuthRefreshListenable(Stream<dynamic> stream) {
+    _subscription = stream.listen((_) => notifyListeners());
   }
-  late final List<StreamSubscription<dynamic>> _subscriptions;
+  late final StreamSubscription<dynamic> _subscription;
   @override
   void dispose() {
-    for (final subscription in _subscriptions) {
-      subscription.cancel();
-    }
+    _subscription.cancel();
     super.dispose();
   }
 }

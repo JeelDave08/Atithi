@@ -1,9 +1,9 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/wishlist_repository.dart';
 
@@ -19,7 +19,7 @@ final wishlistProvider = ChangeNotifierProvider<WishlistNotifier>((ref) {
 
 class WishlistNotifier extends ChangeNotifier {
   WishlistNotifier(this._repository) {
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
       _onAuthChanged,
     );
     unawaited(refresh());
@@ -41,7 +41,7 @@ class WishlistNotifier extends ChangeNotifier {
         message.contains('connection refused');
   }
 
-  late final StreamSubscription<AuthState> _authSubscription;
+  late final StreamSubscription<User?> _authSubscription;
   bool loading = true;
   String? errorMessage;
   String? get currentUserId => _repository.currentUserId;
@@ -49,8 +49,7 @@ class WishlistNotifier extends ChangeNotifier {
   Set<String> get roomIds => Set.unmodifiable(_roomIds);
   bool isWishlisted(String roomId) => _roomIds.contains(roomId);
 
-  Future<void> _onAuthChanged(AuthState state) async {
-    final user = state.session?.user;
+  Future<void> _onAuthChanged(User? user) async {
     _roomIds.clear();
     errorMessage = null;
     _lastError = null;
