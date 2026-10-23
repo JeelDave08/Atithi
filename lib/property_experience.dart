@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'widgets/auto_slide_rooms.dart';
 import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2331,14 +2332,10 @@ class _ResponsiveHomeRooms extends StatefulWidget {
 
 class _ResponsiveHomeRoomsState extends State<_ResponsiveHomeRooms> {
   final PageController _controller = PageController();
-  final PageController _mobileController = PageController(
-    viewportFraction: .88,
-  );
 
   @override
   void dispose() {
     _controller.dispose();
-    _mobileController.dispose();
     super.dispose();
   }
 
@@ -2348,15 +2345,14 @@ class _ResponsiveHomeRoomsState extends State<_ResponsiveHomeRooms> {
       const cardHeight = 520.0;
       final width = constraints.maxWidth;
       if (width < 600) {
-        return SizedBox(
+        // Use AutoSlideRooms for seamless forward-only infinite auto-slide.
+        return AutoSlideRooms(
+          itemCount: widget.rooms.length,
           height: cardHeight,
-          child: PageView.builder(
-            controller: _mobileController,
-            itemCount: widget.rooms.length,
-            itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: _RoomCard(room: widget.rooms[index]),
-            ),
+          itemBuilder: (context, index) => RevealOnScroll(
+            key: ValueKey(widget.rooms[index].id),
+            delay: Duration(milliseconds: (index.clamp(0, 6)) * 120),
+            child: _RoomCard(room: widget.rooms[index]),
           ),
         );
       }

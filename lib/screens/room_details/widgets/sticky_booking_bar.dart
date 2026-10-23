@@ -49,26 +49,52 @@ class StickyBookingBar extends StatelessWidget {
             ),
           ],
         );
-        final bookButton = FilledButton(
-          onPressed: enabled ? onBook : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.navy,
-            foregroundColor: AppColors.cream,
-            disabledBackgroundColor: AppColors.greyText,
-            disabledForegroundColor: AppColors.cream,
-            minimumSize: const Size(0, 52),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            shape: const StadiumBorder(),
-          ),
-          child: const FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'Book This Room →',
-              maxLines: 1,
-              softWrap: false,
-              style: TextStyle(fontWeight: FontWeight.w700),
+
+        final bookButtonColumn = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            SizedBox(
+              height: 54,
+              child: FilledButton(
+                onPressed: enabled ? onBook : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  foregroundColor: AppColors.cream,
+                  disabledBackgroundColor:
+                      AppColors.navy.withValues(alpha: .35),
+                  disabledForegroundColor: AppColors.cream,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  shape: const StadiumBorder(),
+                ),
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Book This Room →',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+            if (!enabled)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Select check-in & check-out dates to continue',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.greyText.withValues(alpha: .8),
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+          ],
         );
 
         return Container(
@@ -90,13 +116,18 @@ class StickyBookingBar extends StatelessWidget {
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
-                  children: [totalLabel, const SizedBox(height: 8), bookButton],
+                  children: [
+                    totalLabel,
+                    const SizedBox(height: 8),
+                    bookButtonColumn,
+                  ],
                 )
               : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(child: totalLabel),
                     const SizedBox(width: 10),
-                    bookButton,
+                    bookButtonColumn,
                   ],
                 ),
         );

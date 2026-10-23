@@ -778,43 +778,8 @@ class _ServiceCard extends StatefulWidget {
   State<_ServiceCard> createState() => _ServiceCardState();
 }
 
-class _ServiceCardState extends State<_ServiceCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _slideAnimation;
+class _ServiceCardState extends State<_ServiceCard> {
   bool _pressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    );
-    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-
-    Future.delayed(Duration(milliseconds: widget.index * 100), () {
-      if (mounted) {
-        _animController.forward();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
 
   IconData _iconForService(PropertyService service) {
     if (service.iconName.isNotEmpty) {
@@ -830,15 +795,10 @@ class _ServiceCardState extends State<_ServiceCard>
     final hasDescription = service.description.trim().isNotEmpty;
     final iconData = _iconForService(service);
 
-    return AnimatedBuilder(
-      animation: _animController,
-      builder: (context, child) => Opacity(
-        opacity: _fadeAnimation.value,
-        child: Transform.translate(
-          offset: Offset(0, _slideAnimation.value),
-          child: child,
-        ),
-      ),
+    return RevealOnScroll(
+      key: ValueKey(service.id),
+      delay: Duration(milliseconds: widget.index * 100),
+      slideFrom: const Offset(-0.24, 0), // slide from left
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) {

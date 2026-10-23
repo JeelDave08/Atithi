@@ -355,6 +355,8 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                 onShare: _shareRoom,
               ),
             ),
+            // 16px gap so photo doesn't look merged with the navy header.
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ];
 
           if (_notFound) {

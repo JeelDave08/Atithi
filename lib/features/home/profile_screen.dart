@@ -49,8 +49,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     await Future<void>.delayed(Duration.zero);
     final user = firebase.FirebaseAuth.instance.currentUser;
     if (!mounted) return;
+
+    // Try to fetch full_name from Supabase profiles table.
+    String? supabaseName;
+    String? supabasePhone;
+    if (user != null) {
+      try {
+        final row = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, phone')
+            .eq('firebase_uid', user.uid)
+            .maybeSingle();
+        supabaseName = _ProfileData._nonEmpty(row?['full_name']);
+        supabasePhone = _ProfileData._nonEmpty(row?['phone']);
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     setState(() {
-      _profile = _ProfileData.fromFirebaseUser(user);
+      _profile = _ProfileData.fromFirebaseUser(
+        user,
+        supabaseName: supabaseName,
+        supabasePhone: supabasePhone,
+      );
       _loading = false;
     });
     _entranceController.forward();
@@ -107,6 +128,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
+  void _showAddPhoneSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => _AddPhoneSheet(
+        onSaved: () {
+          if (!mounted) return;
+          setState(() => _loading = true);
+          _loadProfile();
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _entranceController.dispose();
@@ -154,7 +190,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         _Entrance(
                           animation: _entrance(0),
                           child: ProfileHeader(
-                            name: _profile?.name ?? 'Not provided',
+                            name: _profile?.displayName ?? 'Guest',
+                            isGuest: _profile?.displayName == null,
                             bookings: _bookingsCount?.toString() ?? '…',
                             favorites: ref.watch(wishlistProvider).loading
                                 ? '…'
@@ -179,7 +216,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           child: InfoTile(
                             icon: Icons.person_outline_rounded,
                             label: 'Name',
-                            value: _profile?.name ?? 'Not provided',
+                            value: _profile?.displayName ?? 'Not provided',
+                            hint: _profile?.nameIsFromEmail == true
+                                ? '(from email)'
+                                : null,
                           ),
                         ),
                         const SizedBox(height: 11),
@@ -200,6 +240,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                             value: _profile?.phone ?? 'Not provided',
                           ),
                         ),
+                        if (_profile?.phone == null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 14, top: 4),
+                            child: TextButton(
+                              onPressed: _showAddPhoneSheet,
+                              style: TextButton.styleFrom(
+                                foregroundColor: _profileGold,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '+ Add phone number',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 20),
                         _WishlistMenuTile(
                           count: ref.watch(wishlistProvider).count,
@@ -244,6 +308,7 @@ class ProfileHeader extends StatelessWidget {
     required this.bookings,
     required this.favorites,
     required this.memberSince,
+    this.isGuest = false,
     this.onFavoritesTap,
     super.key,
   });
@@ -252,14 +317,16 @@ class ProfileHeader extends StatelessWidget {
   final String bookings;
   final String favorites;
   final String memberSince;
+  final bool isGuest;
   final VoidCallback? onFavoritesTap;
 
   String get _initials {
+    if (isGuest) return '';
     final parts = name
         .trim()
         .split(RegExp(r'\s+'))
         .where((part) => part.isNotEmpty);
-    if (parts.isEmpty) return 'AT';
+    if (parts.isEmpty) return '';
     return parts.take(2).map((part) => part[0].toUpperCase()).join();
   }
 
@@ -349,7 +416,7 @@ class ProfileHeader extends StatelessWidget {
             ),
           ),
         ),
-        _Avatar(initials: _initials),
+        _Avatar(initials: _initials, isGuest: isGuest),
       ],
     ),
   );
@@ -362,8 +429,9 @@ class ProfileHeader extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials});
+  const _Avatar({required this.initials, this.isGuest = false});
   final String initials;
+  final bool isGuest;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -387,14 +455,20 @@ class _Avatar extends StatelessWidget {
         color: _profileNavy,
       ),
       alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: GoogleFonts.playfairDisplay(
-          color: _profileGold,
-          fontSize: 30,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      child: isGuest
+          ? const Icon(Icons.person_rounded, color: _profileGold, size: 36)
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                initials,
+                maxLines: 1,
+                style: GoogleFonts.playfairDisplay(
+                  color: _profileGold,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
     ),
   );
 }
@@ -451,12 +525,14 @@ class InfoTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.hint,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) => ClipRRect(
@@ -499,15 +575,33 @@ class InfoTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    value,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.dmSans(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (hint != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          hint!,
+                          style: GoogleFonts.dmSans(
+                            color: _profileMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -679,24 +773,77 @@ class _GlowCircle extends StatelessWidget {
 
 class _ProfileData {
   const _ProfileData({
-    required this.name,
+    required this.displayName,
+    required this.nameIsFromEmail,
     required this.email,
     required this.phone,
     required this.memberSince,
   });
 
-  final String? name;
+  /// Resolved display name or null if truly no info at all.
+  final String? displayName;
+
+  /// True when the name was derived from the email prefix (no real name stored).
+  final bool nameIsFromEmail;
   final String? email;
   final String? phone;
   final String? memberSince;
 
-  factory _ProfileData.fromFirebaseUser(firebase.User? user) {
-    final name = _nonEmpty(user?.displayName);
-    final phone = _nonEmpty(user?.phoneNumber);
+  factory _ProfileData.fromFirebaseUser(
+    firebase.User? user, {
+    String? supabaseName,
+    String? supabasePhone,
+  }) {
+    final email = _nonEmpty(user?.email);
     final createdAt = user?.metadata.creationTime;
+
+    // Name resolution chain.
+    String? resolvedName;
+    bool fromEmail = false;
+
+    // 1. Supabase profiles.full_name
+    resolvedName = supabaseName;
+
+    // 2. Firebase displayName
+    resolvedName ??= _nonEmpty(user?.displayName);
+
+    // 3. userMetadata fields
+    if (resolvedName == null) {
+      final meta = user?.providerData.isEmpty == true
+          ? <String, dynamic>{}
+          : (user?.providerData.first as dynamic)?.additionalUserInfo
+                  ?.profile as Map<String, dynamic>? ??
+              <String, dynamic>{};
+      for (final key in ['full_name', 'name', 'display_name']) {
+        final v = _nonEmpty(meta[key]);
+        if (v != null) {
+          resolvedName = v;
+          break;
+        }
+      }
+    }
+
+    // 4. Email prefix -> capitalized words
+    if (resolvedName == null && email != null) {
+      final prefix = email.split('@').first;
+      // Split on . _ - and digit sequences.
+      final parts = prefix.split(RegExp(r'[.\-_0-9]+'))
+          .where((p) => p.isNotEmpty)
+          .map((p) => p[0].toUpperCase() + p.substring(1).toLowerCase())
+          .toList();
+      if (parts.isNotEmpty) {
+        resolvedName = parts.join(' ');
+        fromEmail = true;
+      }
+    }
+
+    // Phone resolution: prefer Supabase, then Firebase.
+    final phone = supabasePhone ?? _nonEmpty(user?.phoneNumber);
+
     return _ProfileData(
-      name: name,
-      email: _nonEmpty(user?.email),
+      displayName: resolvedName,
+      nameIsFromEmail: fromEmail,
+      email: email,
       phone: phone,
       memberSince: createdAt == null
           ? null
@@ -771,6 +918,157 @@ class _WishlistMenuTile extends StatelessWidget {
             const SizedBox(width: 8),
             const Icon(Icons.chevron_right_rounded, color: _profileGold),
           ],
+        ),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Add Phone Sheet
+// ---------------------------------------------------------------------------
+
+class _AddPhoneSheet extends StatefulWidget {
+  const _AddPhoneSheet({required this.onSaved});
+  final VoidCallback onSaved;
+
+  @override
+  State<_AddPhoneSheet> createState() => _AddPhoneSheetState();
+}
+
+class _AddPhoneSheetState extends State<_AddPhoneSheet> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final user = firebase.FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Not signed in');
+      await Supabase.instance.client.from('profiles').upsert({
+        'firebase_uid': user.uid,
+        'phone': _controller.text.trim(),
+      }, onConflict: 'firebase_uid');
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = 'Could not save. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+        decoration: const BoxDecoration(
+          color: _profileCream,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add Phone Number',
+                style: GoogleFonts.playfairDisplay(
+                  color: _profileNavy,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _controller,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                decoration: InputDecoration(
+                  hintText: '10-digit mobile number',
+                  prefixText: '+91  ',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: _profileNavy.withValues(alpha: .35),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _profileGold, width: 2),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().length != 10) {
+                    return 'Enter a valid 10-digit number';
+                  }
+                  return null;
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: _profileRed,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _profileNavy,
+                    foregroundColor: _profileCream,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _saving
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Save',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),
