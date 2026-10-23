@@ -44,16 +44,16 @@ class BookingService {
     try {
       final rows = await _client
           .from('bookings')
-          .select('room_id')
+          .select('id')
           .eq('room_id', roomId)
-          .neq('booking_status', 'cancelled')
+          .eq('booking_status', 'confirmed')
           .lt('check_in', _date(checkOut))
           .gt('check_out', _date(checkIn))
           .limit(1);
       return rows.isNotEmpty;
     } catch (error, stack) {
-      debugPrint('Booking overlap check ignored: $error\n$stack');
-      return false;
+      debugPrint('Booking overlap check failed: $error\n$stack');
+      rethrow;
     }
   }
 
@@ -133,27 +133,13 @@ class BookingService {
       'guest_photo_path': photoPath,
       'id_proof_type': idProofType,
       'id_proof_path': idProofPath,
-      'booking_status': 'confirmed',
+      'booking_status': 'pending',
       'payment_status': 'pending',
     };
 
     try {
       await _client.from('bookings').insert(row);
     } on PostgrestException catch (error) {
-      final statusConstraintError =
-          (error.code == '22P02' || error.code == '23514') &&
-          error.message.contains('booking_status');
-      if (statusConstraintError) {
-        try {
-          await _client.from('bookings').insert({
-            ...row,
-            'booking_status': 'pending',
-          });
-          return BookingResult(photoPath: photoPath, idProofPath: idProofPath);
-        } catch (retryError) {
-          throw BookingStageException(BookingFailureStage.database, retryError);
-        }
-      }
       throw BookingStageException(BookingFailureStage.database, error);
     } catch (error) {
       throw BookingStageException(BookingFailureStage.database, error);

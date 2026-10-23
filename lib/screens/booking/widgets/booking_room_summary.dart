@@ -1,9 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/image_utils.dart';
 import '../../../models/room.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_network_image.dart';
 import '../../room_details/widgets/room_amenities_card.dart';
 import 'booking_section_card.dart';
 
@@ -22,36 +21,9 @@ class BookingRoomSummary extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: AspectRatio(
             aspectRatio: 16 / 10,
-            child: room.imageUrls.isEmpty
-                ? const ColoredBox(
-                    color: AppColors.cream,
-                    child: Center(
-                      child: Icon(
-                        Icons.bed_outlined,
-                        color: AppColors.darkGold,
-                        size: 38,
-                      ),
-                    ),
-                  )
-                : CachedNetworkImage(
-                    imageUrl: optimizedImageUrl(room.imageUrls.first),
-                    fit: BoxFit.cover,
-                    memCacheWidth: 800,
-                    maxWidthDiskCache: 800,
-                    fadeInDuration: const Duration(milliseconds: 200),
-                    placeholder: (_, _) =>
-                        const ColoredBox(color: AppColors.cream),
-                    errorWidget: (_, _, _) => const ColoredBox(
-                      color: AppColors.cream,
-                      child: Center(
-                        child: Icon(
-                          Icons.bed_outlined,
-                          color: AppColors.darkGold,
-                          size: 38,
-                        ),
-                      ),
-                    ),
-                  ),
+            child: AppNetworkImage(
+              url: room.imageUrls.isEmpty ? null : room.imageUrls.first,
+            ),
           ),
         ),
         if (room.badge?.trim().isNotEmpty == true ||

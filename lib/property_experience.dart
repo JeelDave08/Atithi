@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -12,11 +12,13 @@ import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'core/image_utils.dart';
 import 'models/room.dart';
 import 'theme/app_colors.dart';
 import 'widgets/auto_slide_rooms.dart';
 import 'widgets/auto_slide_services.dart';
+import 'widgets/app_network_image.dart';
+import 'providers/rooms_provider.dart';
+import 'navigation/room_navigation.dart';
 
 const _experienceCream = AppColors.cream;
 const _experienceCard = AppColors.surface;
@@ -140,18 +142,6 @@ class PropertyRoom {
   final List<String> imageUrls;
   final String availability;
 
-  factory PropertyRoom.fromRoom(Room room) => PropertyRoom(
-    id: room.id,
-    name: room.roomName ?? 'Room',
-    type: room.roomType ?? '',
-    description: room.description ?? '',
-    pricePerNight: room.pricePerNight ?? 0,
-    capacity: room.capacity ?? 0,
-    amenities: room.amenities,
-    imageUrls: room.imageUrls,
-    availability: room.status ?? '',
-  );
-
   factory PropertyRoom.fromRow(Map<String, dynamic> data) {
     final capacity = data['capacity'];
     final price = data['price_per_night'];
@@ -163,7 +153,9 @@ class PropertyRoom {
       pricePerNight: num.tryParse(price.toString()) ?? 0,
       capacity: num.tryParse(capacity.toString())?.toInt() ?? 0,
       amenities: _stringList(data['amenities']),
-      imageUrls: _stringList(data['image_urls']),
+      imageUrls: _stringList(
+        data['image_urls'] ?? data['images'] ?? data['image_url'],
+      ),
       availability: _stringValue(data['status']),
     );
   }
@@ -273,21 +265,6 @@ class PropertyContentRepository {
     }
   }
 
-  Future<List<Room>> getHomeRooms() async {
-    try {
-      final rows = await _supabase
-          .from('rooms')
-          .select()
-          .eq('is_published', true)
-          .order('sort_order')
-          .limit(5);
-      return rows.map((row) => Room.fromJson(row)).toList();
-    } catch (error, stackTrace) {
-      _logPropertyDataFailure('Load Home rooms', error, stackTrace);
-      rethrow;
-    }
-  }
-
   Future<void> createContactMessage({
     required String name,
     required String email,
@@ -315,7 +292,7 @@ class PropertyContentRepository {
     try {
       final rows = await _supabase
           .from('bookings')
-          .select('*, rooms(room_name, image_urls)')
+          .select('*, rooms(*)')
           .eq('firebase_uid', user.uid)
           .order('created_at', ascending: false);
       return rows.map((row) => Map<String, dynamic>.from(row)).toList();
@@ -340,7 +317,11 @@ void _logPropertyDataFailure(
 
 String _stringValue(Object? value) => value is String ? value.trim() : '';
 
-List<String> _stringList(Object? value) => value is Iterable
+List<String> _stringList(Object? value) => value is String
+    ? value.trim().isEmpty
+          ? const []
+          : [value.trim()]
+    : value is Iterable
     ? value
           .whereType<String>()
           .map((item) => item.trim())
@@ -1693,7 +1674,19 @@ class _PropertyRoomsScreenState extends State<PropertyRoomsScreen> {
                   for (final room in rooms)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _RoomCard(room: room),
+                      child: _RoomCard(
+                        room: Room(
+                          id: room.id,
+                          roomName: room.name,
+                          roomType: room.type,
+                          description: room.description,
+                          pricePerNight: room.pricePerNight.toDouble(),
+                          capacity: room.capacity,
+                          amenities: room.amenities,
+                          imageUrls: room.imageUrls,
+                          status: room.availability,
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -1914,12 +1907,14 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                   : const <String, dynamic>{};
               final room =
                   _bookingValue(roomRow, 'room_name') ??
+                  _bookingValue(roomRow, 'room_number') ??
                   _bookingValue(booking, 'room_id');
-              final images = roomRow['image_urls'];
-              final imageUrl = images is List && images.isNotEmpty
-                  ? images.first?.toString()
-                  : null;
-              final status = _bookingValue(booking, 'booking_status');
+              final roomImages = Room.fromJson(roomRow).imageUrls;
+              final imageUrl = roomImages.isEmpty ? null : roomImages.first;
+              final rawStatus = _bookingValue(booking, 'booking_status');
+              final status = rawStatus?.toLowerCase() == 'pending'
+                  ? 'Pending'
+                  : rawStatus;
               final checkIn = _bookingValue(booking, 'check_in');
               final checkOut = _bookingValue(booking, 'check_out');
               final total = _bookingValue(booking, 'total_amount');
@@ -1946,29 +1941,7 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                         width: 78,
                         child: AspectRatio(
                           aspectRatio: 1,
-                          child: imageUrl == null
-                              ? const ColoredBox(
-                                  color: AppColors.gold,
-                                  child: Icon(
-                                    Icons.bed_outlined,
-                                    color: AppColors.navy,
-                                  ),
-                                )
-                              : CachedNetworkImage(
-                                  imageUrl: optimizedImageUrl(imageUrl),
-                                  fit: BoxFit.cover,
-                                  memCacheWidth: 300,
-                                  maxWidthDiskCache: 300,
-                                  placeholder: (_, _) =>
-                                      const ColoredBox(color: AppColors.cream),
-                                  errorWidget: (_, _, _) => const ColoredBox(
-                                    color: AppColors.cream,
-                                    child: Icon(
-                                      Icons.bed_outlined,
-                                      color: AppColors.darkGold,
-                                    ),
-                                  ),
-                                ),
+                          child: AppNetworkImage(url: imageUrl),
                         ),
                       ),
                     ),
@@ -2113,16 +2086,20 @@ String? _bookingValue(Map<String, dynamic> booking, String key) {
   return null;
 }
 
-class PropertyRoomsPreview extends StatelessWidget {
+class PropertyRoomsPreview extends ConsumerWidget {
   const PropertyRoomsPreview({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const repository = PropertyContentRepository();
-    return _RetryableSection<List<Room>>(
-      load: repository.getHomeRooms,
-      errorMessage: 'Room information could not be loaded. Please try again.',
-      builder: (context, rooms) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roomsAsync = ref.watch(roomsProvider);
+    return roomsAsync.when(
+      loading: () => const _InlineLoading(),
+      error: (error, stack) => _InlineDataState(
+        text: 'Room information could not be loaded. Please try again.',
+        diagnostic: _debugDataError(error),
+        onRetry: () => ref.invalidate(roomsProvider),
+      ),
+      data: (rooms) {
         if (rooms.isEmpty) {
           return const _InlineDataState(text: 'No rooms are available yet.');
         }
@@ -2130,7 +2107,7 @@ class PropertyRoomsPreview extends StatelessWidget {
         return AutoSlideRooms(
           itemCount: previewRooms.length,
           itemBuilder: (context, index) => RepaintBoundary(
-            child: _RoomCard(room: PropertyRoom.fromRoom(previewRooms[index])),
+            child: _RoomCard(room: previewRooms[index]),
           ),
         );
       },
@@ -2422,7 +2399,7 @@ class _RetryableSectionState<T> extends State<_RetryableSection<T>> {
 
 class _RoomCard extends StatelessWidget {
   const _RoomCard({required this.room});
-  final PropertyRoom room;
+  final Room room;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -2437,11 +2414,7 @@ class _RoomCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => PropertyRoomDetailsScreen(room: room),
-            ),
-          ),
+          onTap: () => openRoomDetails(context, room),
           child: _RoomImageCarousel(imageUrls: room.imageUrls, height: 175),
         ),
         _roomDetails(context),
@@ -2456,7 +2429,7 @@ class _RoomCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          room.name,
+          room.roomName ?? 'Room',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -2467,15 +2440,15 @@ class _RoomCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${room.type.isEmpty ? 'Room' : room.type} · ${room.capacity} guests',
+          '${room.roomType?.isNotEmpty == true ? room.roomType : 'Room'} · ${room.capacity ?? 0} guests',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
         ),
-        if (room.description.isNotEmpty) ...[
+        if (room.description?.isNotEmpty == true) ...[
           const SizedBox(height: 5),
           Text(
-            room.description,
+            room.description!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -2491,7 +2464,7 @@ class _RoomCard extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                '₹${NumberFormat.decimalPattern('en_IN').format(room.pricePerNight)} / night',
+                '₹${NumberFormat.decimalPattern('en_IN').format(room.pricePerNight ?? 0)} / night',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -2502,7 +2475,7 @@ class _RoomCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _PropertyAvailabilityBadge(
-              available: room.availability.toLowerCase() == 'available',
+              available: room.status?.toLowerCase() == 'available',
             ),
           ],
         ),
@@ -2522,11 +2495,7 @@ class _RoomCard extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => PropertyRoomDetailsScreen(room: room),
-                  ),
-                ),
+                onPressed: () => openRoomDetails(context, room),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -2541,7 +2510,9 @@ class _RoomCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: () => _showBookingUnavailable(context),
+                onPressed: room.status?.toLowerCase() == 'available'
+                    ? () => openRoomBooking(context, room)
+                    : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: _experienceNavy,
                   foregroundColor: _experienceCream,
@@ -2800,31 +2771,7 @@ class _PropertyImage extends StatelessWidget {
     child: SizedBox(
       height: height,
       width: double.infinity,
-      child: url == null || url!.isEmpty
-          ? const _ImagePlaceholder()
-          : CachedNetworkImage(
-              imageUrl: url!,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => const _ImagePlaceholder(),
-              errorWidget: (_, _, _) => const _ImagePlaceholder(),
-            ),
-    ),
-  );
-}
-
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder();
-  @override
-  Widget build(BuildContext context) => const DecoratedBox(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [_experienceNavy, Color(0xFF416277)],
-        begin: Alignment.bottomLeft,
-        end: Alignment.topRight,
-      ),
-    ),
-    child: Center(
-      child: Icon(Icons.hotel_outlined, color: _experienceLightGold, size: 42),
+      child: AppNetworkImage(url: url),
     ),
   );
 }
@@ -3275,23 +3222,25 @@ class _ServiceVisual extends StatelessWidget {
     if (_isWebUrl(value)) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: CachedNetworkImage(
-          imageUrl: value,
+        child: Image.network(
+          value,
           width: 30,
           height: 30,
           fit: BoxFit.cover,
-          errorWidget: (_, _, _) =>
+          errorBuilder: (_, _, _) =>
               Icon(_serviceIcon(value), size: 25, color: _experienceGold),
-          placeholder: (_, _) => const SizedBox(
-            width: 30,
-            height: 30,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: _experienceGold,
-              ),
-            ),
-          ),
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : const SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: _experienceGold,
+                    ),
+                  ),
+                ),
         ),
       );
     }

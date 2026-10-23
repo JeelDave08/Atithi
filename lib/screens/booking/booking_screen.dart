@@ -305,11 +305,6 @@ class _BookingScreenState extends State<BookingScreen> {
       _showMessage('This room fits up to ${widget.room.capacity} guests.');
       return;
     }
-    if (widget.room.status != 'available') {
-      _showMessage('This room is not available for booking.');
-      return;
-    }
-
     setState(() => _submitting = true);
     try {
       final conflict = await _service.hasConflict(
