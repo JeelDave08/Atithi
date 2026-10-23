@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'features/home/widgets/reveal_on_scroll.dart';
+import 'features/home/widgets/why_choose_cards.dart';
 import 'models/room.dart';
 import 'theme/app_colors.dart';
 import 'widgets/auto_slide_services.dart';
@@ -22,7 +23,6 @@ import 'providers/rooms_provider.dart';
 import 'navigation/room_navigation.dart';
 import 'core/navigation/app_shell.dart';
 import 'core/responsive/app_container.dart';
-import 'core/responsive/breakpoints.dart';
 import 'widgets/wishlist_button.dart';
 
 const _experienceCream = AppColors.cream;
@@ -465,7 +465,7 @@ class _AboutContentState extends State<_AboutContent>
   @override
   Widget build(BuildContext context) {
     final reducedMotion = _motionDisabled ?? false;
-    final reasons = _WhyAtithi.reasons;
+    final reasons = WhyChooseCards.reasons;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
       children: [
@@ -1317,15 +1317,10 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
       future: _property,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _PageState(
-            message: 'We could not load the available services.',
-            diagnostic: _debugDataError(snapshot.error),
-            isError: true,
-            onRetry: _retry,
-          );
+          return _buildErrorState();
         }
         if (!snapshot.hasData) {
-          return const _PageLoading();
+          return _buildLoadingState();
         }
         final property = snapshot.data;
         if (!_servicesLoaded || _servicesPropertyId != property?.id) {
@@ -1337,73 +1332,182 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
           future: _services,
           builder: (context, servicesSnapshot) {
             if (servicesSnapshot.hasError) {
-              return _PageState(
-                message: 'We could not load the available services.',
-                diagnostic: _debugDataError(servicesSnapshot.error),
-                isError: true,
-                onRetry: _retry,
-              );
+              return _buildErrorState();
             }
             if (!servicesSnapshot.hasData) {
-              return const _PageLoading();
+              return _buildLoadingState(property);
             }
             final services = servicesSnapshot.data!;
             if (services.isEmpty) {
-              return const _PageState(
-                message: 'No active services have been published yet.',
-              );
+              return _buildEmptyState();
             }
-            final columns = context.screenWidth >= 1024
-                ? 4
-                : context.screenWidth >= 600
-                ? 3
-                : 2;
             return RefreshIndicator(
+              color: AppColors.gold,
               onRefresh: () => _refreshServices(property?.id),
-              child: CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                    sliver: SliverList.list(
-                      children: [
-                        if (property != null) ...[
-                          const Text(
-                            'Atithi',
-                            style: TextStyle(
-                              color: _experienceNavy,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ],
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                itemCount: services.length + 1,
+                separatorBuilder: (_, index) => index == 0
+                    ? const SizedBox(height: 20)
+                    : const SizedBox(height: 14),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _buildIntro(property);
+                  }
+                  final serviceIndex = index - 1;
+                  return RevealOnScroll(
+                    delay: Duration(
+                      milliseconds: (serviceIndex * 80).clamp(0, 600),
                     ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 4,
-                        childAspectRatio: columns == 2 ? 1.65 : 1.2,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => _AnimatedSection(
-                          delay: Duration(milliseconds: (i * 50).clamp(0, 400)),
-                          child: _ServiceCard(service: services[i]),
-                        ),
-                        childCount: services.length,
-                      ),
-                    ),
-                  ),
-                ],
+                    slideFrom: const Offset(0, .12),
+                    child: _ServiceCard(service: services[serviceIndex]),
+                  );
+                },
               ),
             );
           },
         );
       },
+    ),
+  );
+
+  Widget _buildIntro(PropertyContent? property) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (property != null && property.name.trim().isNotEmpty) ...[
+        Text(
+          property.name.trim().toUpperCase(),
+          style: GoogleFonts.dmSans(
+            color: AppColors.gold,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+      Text(
+        'What we offer',
+        style: GoogleFonts.playfairDisplay(
+          color: AppColors.navy,
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Container(
+        width: 60,
+        height: 4,
+        decoration: BoxDecoration(
+          color: AppColors.gold,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Everything you need for a comfortable stay.',
+        style: GoogleFonts.dmSans(
+          color: AppColors.secondaryText,
+          fontSize: 14,
+        ),
+      ),
+    ],
+  );
+
+  Widget _buildLoadingState([PropertyContent? property]) => ListView.separated(
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: 6,
+    separatorBuilder: (_, index) => index == 0
+        ? const SizedBox(height: 20)
+        : const SizedBox(height: 14),
+    itemBuilder: (context, index) {
+      if (index == 0) return _buildIntro(property);
+      return const _ServiceCardSkeleton();
+    },
+  );
+
+  Widget _buildEmptyState() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.room_service_outlined,
+            size: 54,
+            color: AppColors.gold,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No services available yet',
+            style: GoogleFonts.playfairDisplay(
+              color: AppColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check back later or contact the front desk.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.dmSans(
+              color: AppColors.secondaryText,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildErrorState() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 48,
+            color: AppColors.gold,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Could not load services',
+            style: GoogleFonts.playfairDisplay(
+              color: AppColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check your connection and try again.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.dmSans(
+              color: AppColors.secondaryText,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _retry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.navy,
+              foregroundColor: AppColors.cream,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+            ),
+            child: const Text('Try again'),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -2569,7 +2673,7 @@ class PropertyHighlightsPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _WhyAtithi();
+    return const WhyChooseCards();
   }
 }
 
@@ -3012,7 +3116,7 @@ class _PropertyPage extends StatelessWidget {
         foregroundColor: _experienceNavy,
         title: Text(
           title,
-          style: const TextStyle(
+          style: GoogleFonts.playfairDisplay(
             color: _experienceNavy,
             fontWeight: FontWeight.w700,
           ),
@@ -3255,294 +3359,211 @@ class _InfoSection extends StatelessWidget {
   );
 }
 
-class _WhyAtithi extends StatelessWidget {
-  const _WhyAtithi();
-
-  static const reasons = [
-    ('Premium Rooms & Suites', Icons.king_bed_outlined),
-    ('Safe & Secure Stay', Icons.shield_outlined),
-    ('24/7 Support', Icons.support_agent_outlined),
-    ('Best Rates', Icons.local_offer_outlined),
-  ];
-
-  @override
-  Widget build(BuildContext context) => GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    itemCount: reasons.length,
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      mainAxisExtent: 170,
-    ),
-    itemBuilder: (context, index) => RevealOnScroll(
-      delay: Duration(milliseconds: index * 80),
-      slideFrom: const Offset(0, .14),
-      child: _WhyFlipTile(
-        index: index,
-        title: reasons[index].$1,
-        icon: reasons[index].$2,
-        detail: const [
-          'Spacious rooms with modern comfort.',
-          'Your safety comes first, always.',
-          'Our team is always one call away.',
-          'Book direct for honest prices.',
-        ][index],
-      ),
-    ),
-  );
-}
-
-class _WhyFlipTile extends StatefulWidget {
-  const _WhyFlipTile({
-    required this.index,
-    required this.title,
-    required this.icon,
-    required this.detail,
-  });
-  final int index;
-  final String title;
-  final IconData icon;
-  final String detail;
-
-  @override
-  State<_WhyFlipTile> createState() => _WhyFlipTileState();
-}
-
-class _WhyFlipTileState extends State<_WhyFlipTile>
-    with TickerProviderStateMixin {
-  late final AnimationController _flip = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 500),
-  );
-  late final AnimationController _tap = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 120),
-  );
-  late final Animation<double> _scale = Tween<double>(
-    begin: 1.0,
-    end: 0.96,
-  ).animate(CurvedAnimation(parent: _tap, curve: Curves.easeInOut));
-  bool _reducedMotion = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _reducedMotion = MediaQuery.disableAnimationsOf(context);
-  }
-
-  @override
-  void dispose() {
-    _flip.dispose();
-    _tap.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final curvedFlip = CurvedAnimation(
-      parent: _flip,
-      curve: Curves.easeInOutCubic,
-    );
-    return GestureDetector(
-      onTapDown: (_) {
-        if (!_reducedMotion) _tap.forward();
-      },
-      onTapUp: (_) {
-        if (!_reducedMotion) _tap.reverse();
-      },
-      onTapCancel: () {
-        if (!_reducedMotion) _tap.reverse();
-      },
-      onTap: () {
-        if (!_reducedMotion) {
-          _flip.isCompleted ? _flip.reverse() : _flip.forward();
-        }
-      },
-      child: AnimatedBuilder(
-        animation: Listenable.merge([curvedFlip, _scale]),
-        builder: (context, _) {
-          final flipVal = curvedFlip.value;
-          final back = flipVal >= .5;
-          return Transform.scale(
-            scale: _scale.value,
-            child: Transform(
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, .001)
-                ..rotateY(math.pi * flipVal),
-              alignment: Alignment.center,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: back ? _experienceNavy : _experienceCard,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: _experienceLightGold.withValues(alpha: .75),
-                  ),
-                ),
-                child: back
-                    ? Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.rotationY(math.pi),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(widget.icon, color: _experienceLightGold),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.detail,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _experienceCream,
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Stack(
-                        children: [
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Text(
-                              '0${widget.index + 1}',
-                              style: TextStyle(
-                                color: _experienceGold.withValues(alpha: .22),
-                                fontSize: 19,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: _experienceLightGold.withValues(
-                                      alpha: .3,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    widget.icon,
-                                    color: _experienceGold,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  widget.title,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _experienceNavy,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ServiceCard extends StatelessWidget {
+class _ServiceCard extends StatefulWidget {
   const _ServiceCard({required this.service});
   final PropertyService service;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: _experienceCard,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: _experienceLightGold.withValues(alpha: .65)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ServiceVisual(value: service.iconName),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                service.name,
-                style: const TextStyle(
-                  color: _experienceNavy,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                service.description,
-                style: const TextStyle(
-                  color: AppColors.secondaryText,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
+  State<_ServiceCard> createState() => _ServiceCardState();
 }
 
-class _ServiceVisual extends StatelessWidget {
-  const _ServiceVisual({required this.value});
-  final String value;
+class _ServiceCardState extends State<_ServiceCard> {
+  bool _pressed = false;
+
+  IconData _iconForService(PropertyService service) {
+    if (service.iconName.isNotEmpty) {
+      final mapped = serviceIcon(service.iconName);
+      if (mapped != Icons.star_rounded) return mapped;
+    }
+    return serviceIcon(service.name);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (_isWebUrl(value)) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          value,
-          width: 30,
-          height: 30,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              Icon(_serviceIcon(value), size: 25, color: _experienceGold),
-          loadingBuilder: (_, child, progress) => progress == null
-              ? child
-              : const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: _experienceGold,
-                    ),
+    final service = widget.service;
+    final icon = _iconForService(service);
+    final hasDescription = service.description.trim().isNotEmpty;
+
+    return Semantics(
+      button: true,
+      label: service.name,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.28),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6E7C3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 26,
+                    color: const Color(0xFFB98A2C),
                   ),
                 ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        service.name,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navy,
+                        ),
+                      ),
+                      if (hasDescription) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          service.description.trim(),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13,
+                            color: AppColors.secondaryText,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFF0D78F),
+                        AppColors.gold,
+                      ],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 15,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      );
-    }
-    return Icon(_serviceIcon(value), size: 25, color: _experienceGold);
+      ),
+    );
   }
 }
 
-IconData _serviceIcon(String value) => serviceIcon(value);
+class _ServiceCardSkeleton extends StatelessWidget {
+  const _ServiceCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(
+        color: AppColors.gold.withValues(alpha: 0.28),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.navy.withValues(alpha: 0.08),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: Shimmer.fromColors(
+      baseColor: const Color(0xFFE9E2D5),
+      highlightColor: Colors.white,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 16,
+                  width: 140,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 12,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 IconData serviceIcon(String name) {
   final value = name.toLowerCase();
@@ -3554,18 +3575,23 @@ IconData serviceIcon(String name) {
   if (value.contains('housekeeping') || value.contains('cleaning')) {
     return Icons.cleaning_services_rounded;
   }
-  if (value.contains('iron')) return Icons.iron_rounded;
   if (value.contains('laundry') || value.contains('washing')) {
     return Icons.local_laundry_service_rounded;
-  }
-  if (value.contains('breakfast') || value.contains('buffet')) {
-    return Icons.free_breakfast_rounded;
   }
   if (value.contains('room service') ||
       value.contains('food') ||
       value.contains('dining') ||
       value.contains('restaurant')) {
     return Icons.room_service_rounded;
+  }
+  if (value.contains('reception') ||
+      value.contains('desk') ||
+      value.contains('front') ||
+      value.contains('support')) {
+    return Icons.support_agent_rounded;
+  }
+  if (value.contains('breakfast') || value.contains('buffet')) {
+    return Icons.free_breakfast_rounded;
   }
   if (value.contains('parking') || value.contains('park')) {
     return Icons.local_parking_rounded;
@@ -3586,15 +3612,15 @@ IconData serviceIcon(String name) {
       value.contains('transfer')) {
     return Icons.local_taxi_rounded;
   }
+  if (value.contains('security')) {
+    return Icons.security_rounded;
+  }
   if (value.contains('air condition') ||
       RegExp(r'(^|\W)ac($|\W)').hasMatch(value)) {
     return Icons.ac_unit_rounded;
   }
+  if (value.contains('iron')) return Icons.iron_rounded;
   if (value.contains('tv')) return Icons.tv_rounded;
-  if (value.contains('security')) return Icons.security_rounded;
-  if (value.contains('work desk') || value.contains('desk')) {
-    return Icons.desk_rounded;
-  }
   return Icons.star_rounded;
 }
 
@@ -3707,14 +3733,7 @@ String? _requiredField(
   if (input.isEmpty) return 'Please enter your $label.';
   if (input.length > maxLength) return 'Your $label is too long.';
   return null;
-}
-
-bool _isWebUrl(String value) {
-  final uri = Uri.tryParse(value);
-  return uri != null &&
-      (uri.scheme == 'https' || uri.scheme == 'http') &&
-      uri.host.isNotEmpty;
-}
+  }
 
 void _showBookingUnavailable(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(

@@ -12,12 +12,13 @@ class RoomsHeader extends StatelessWidget {
   final String? imageUrl;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: context.isMobile ? 220 : 260,
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(
+      minHeight: context.isMobile ? 220 : 260,
+    ),
     child: ClipRRect(
       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
       child: Stack(
-        fit: StackFit.expand,
         children: [
           Positioned.fill(
             child: imageUrl != null && imageUrl!.trim().isNotEmpty
@@ -42,7 +43,7 @@ class RoomsHeader extends StatelessWidget {
                 16,
                 8,
                 16,
-                context.isMobile ? 16 : 44,
+                context.isMobile ? 24 : 32,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -121,7 +122,7 @@ class RoomsHeader extends StatelessWidget {
                   SizedBox(height: context.isMobile ? 6 : 8),
                   const Text(
                     'Find your perfect stay from a wide range of rooms, designed for comfort and luxury.',
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white70,
@@ -136,7 +137,7 @@ class RoomsHeader extends StatelessWidget {
                       Flexible(
                         child: Text(
                           "More than a stay, it's an experience",
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.right,
                           style: GoogleFonts.playfairDisplay(

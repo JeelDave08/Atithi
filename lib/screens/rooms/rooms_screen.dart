@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../property_experience.dart'
+    show PropertyContentRepository, PropertyService, serviceIcon;
 import '../../models/room.dart';
 import '../../core/navigation/app_shell.dart';
 import '../../core/responsive/breakpoints.dart';
@@ -281,6 +284,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: contentWidth),
+                            child: const _ServicesSection(),
+                          ),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: contentWidth),
                             child: const Padding(
                               padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
                               child: WhyChooseAtithiCard(),
@@ -290,7 +301,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       ),
                       SliverToBoxAdapter(
                         child: SizedBox(
-                          height: MediaQuery.paddingOf(context).bottom + 90,
+                          height: MediaQuery.paddingOf(context).bottom + 120,
                         ),
                       ),
                     ],
@@ -622,4 +633,392 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
     );
   }
+}
+
+class _ServicesSection extends StatefulWidget {
+  const _ServicesSection();
+
+  @override
+  State<_ServicesSection> createState() => _ServicesSectionState();
+}
+
+class _ServicesSectionState extends State<_ServicesSection> {
+  List<PropertyService>? _services;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      const repository = PropertyContentRepository();
+      final services = await repository.getServices();
+      if (!mounted) return;
+      setState(() {
+        _services = services;
+        _loading = false;
+      });
+    } catch (e, stack) {
+      debugPrint('Error loading services in RoomsScreen: $e\n$stack');
+      if (!mounted) return;
+      setState(() {
+        _services = const [];
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loading && (_services == null || _services!.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Our Services',
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF12284C),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 60,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD4A84F),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/services'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFD4A84F),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'View All',
+                    style: TextStyle(
+                      color: Color(0xFFD4A84F),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 150,
+            child: _loading
+                ? ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: 4,
+                    separatorBuilder: (_, _) => const SizedBox(width: 14),
+                    itemBuilder: (context, index) =>
+                        const _ServiceCardShimmer(),
+                  )
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _services!.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 14),
+                    itemBuilder: (context, index) => _ServiceCard(
+                      service: _services![index],
+                      index: index,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceCard extends StatefulWidget {
+  const _ServiceCard({
+    required this.service,
+    required this.index,
+  });
+
+  final PropertyService service;
+  final int index;
+
+  @override
+  State<_ServiceCard> createState() => _ServiceCardState();
+}
+
+class _ServiceCardState extends State<_ServiceCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _slideAnimation;
+  bool _pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    );
+    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    Future.delayed(Duration(milliseconds: widget.index * 100), () {
+      if (mounted) {
+        _animController.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  IconData _iconForService(PropertyService service) {
+    if (service.iconName.isNotEmpty) {
+      final mapped = serviceIcon(service.iconName);
+      if (mapped != Icons.star_rounded) return mapped;
+    }
+    return serviceIcon(service.name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final service = widget.service;
+    final hasDescription = service.description.trim().isNotEmpty;
+    final iconData = _iconForService(service);
+
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) => Opacity(
+        opacity: _fadeAnimation.value,
+        child: Transform.translate(
+          offset: Offset(0, _slideAnimation.value),
+          child: child,
+        ),
+      ),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          context.push('/services');
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFDF8),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFFD4A84F).withValues(alpha: 0.25),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF12284C).withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6E7C3),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            iconData,
+                            size: 24,
+                            color: const Color(0xFFB98A2C),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                service.name,
+                                maxLines: hasDescription ? 1 : 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF12284C),
+                                ),
+                              ),
+                              if (hasDescription) ...[
+                                const SizedBox(height: 2),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 24),
+                                    child: Text(
+                                      service.description.trim(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 12,
+                                        color: const Color(0xFF6B7280),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFE5C07B),
+                            Color(0xFFD4A84F),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceCardShimmer extends StatelessWidget {
+  const _ServiceCardShimmer();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 150,
+    height: 150,
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFFDF8),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: const Color(0xFFD4A84F).withValues(alpha: 0.25),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF12284C).withValues(alpha: 0.08),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    padding: const EdgeInsets.all(12),
+    child: Shimmer.fromColors(
+      baseColor: const Color(0xFFE9E2D5),
+      highlightColor: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 14,
+            width: 90,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 10,
+            width: 60,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

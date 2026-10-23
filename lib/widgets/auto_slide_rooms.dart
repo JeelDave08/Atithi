@@ -6,7 +6,7 @@ class AutoSlideRooms extends StatefulWidget {
   const AutoSlideRooms({
     required this.itemCount,
     required this.itemBuilder,
-    this.height = 540,
+    this.height = 450,
     super.key,
   });
 
