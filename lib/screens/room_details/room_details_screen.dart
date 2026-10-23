@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -62,7 +63,9 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   bool _favorite = false;
   bool _descriptionExpanded = false;
   bool _checkingAvailability = true;
-  bool _dateConflict = false;
+  bool? _isAvailable;
+  String? _availabilityError;
+  Timer? _availabilityDebounce;
   bool _notFound = false;
   Object? _loadError;
   String? _debugError;
@@ -77,20 +80,26 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   static DateTime _dateOnly(DateTime date) =>
       DateTime(date.year, date.month, date.day);
 
-  int get _nights => math.max(1, _checkOut.difference(_checkIn).inDays);
+  int get _nights => math.max(0, _checkOut.difference(_checkIn).inDays);
   double get _pricePerNight => _room?.pricePerNight ?? 0;
   double get _totalAmount => _pricePerNight * _nights * (1 + kTaxRate);
-  bool get _statusAvailable => _room?.status == 'available' && !_dateConflict;
+  bool get _statusAvailable => _isAvailable == true;
   bool get _capacityExceeded =>
       _room?.capacity != null && _adults + _children > _room!.capacity!;
   bool get _canBook =>
-      _statusAvailable && !_checkingAvailability && !_capacityExceeded;
+      _statusAvailable &&
+      !_checkingAvailability &&
+      !_capacityExceeded &&
+      _nights >= 1 &&
+      _adults >= 1;
 
   @override
   void initState() {
     super.initState();
     _room = widget.room;
-    _checkIn = _dateOnly(widget.checkIn ?? DateTime.now());
+    final today = _dateOnly(DateTime.now());
+    _checkIn = _dateOnly(widget.checkIn ?? today);
+    if (_checkIn.isBefore(today)) _checkIn = today;
     _checkOut = _dateOnly(
       widget.checkOut ?? _checkIn.add(const Duration(days: 1)),
     );
@@ -121,6 +130,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
 
   @override
   void dispose() {
+    _availabilityDebounce?.cancel();
     _entranceController.dispose();
     super.dispose();
   }
@@ -204,19 +214,53 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
     );
   }
 
-  Future<void> _refreshAvailability() async {
+  Future<bool?> _refreshAvailability({bool debounce = false}) async {
+    _availabilityDebounce?.cancel();
+    if (debounce) {
+      ++_availabilityRequest;
+      setState(() {
+        _checkingAvailability = true;
+        _isAvailable = null;
+        _availabilityError = null;
+      });
+      _availabilityDebounce = Timer(const Duration(milliseconds: 400), () {
+        if (mounted) _runAvailabilityCheck();
+      });
+      return null;
+    }
+    return _runAvailabilityCheck();
+  }
+
+  Future<bool?> _runAvailabilityCheck() async {
     final request = ++_availabilityRequest;
-    if (mounted) setState(() => _checkingAvailability = true);
-    final hasConflict = await _service.hasBookingConflict(
-      roomId: widget.roomId,
-      checkIn: _checkIn,
-      checkOut: _checkOut,
-    );
-    if (!mounted || request != _availabilityRequest) return;
-    setState(() {
-      _dateConflict = hasConflict;
-      _checkingAvailability = false;
-    });
+    if (mounted) {
+      setState(() {
+        _checkingAvailability = true;
+        _availabilityError = null;
+      });
+    }
+    try {
+      final hasConflict = await _service.hasBookingConflict(
+        roomId: widget.roomId,
+        checkIn: _checkIn,
+        checkOut: _checkOut,
+      );
+      if (!mounted || request != _availabilityRequest) return null;
+      setState(() {
+        _isAvailable = !hasConflict;
+        _checkingAvailability = false;
+      });
+      return !hasConflict;
+    } catch (error) {
+      if (!mounted || request != _availabilityRequest) return null;
+      setState(() {
+        _isAvailable = null;
+        _checkingAvailability = false;
+        _availabilityError = 'Could not check availability. Please retry.';
+      });
+      _showLoginMessage('Network error checking availability. Please retry.');
+      return null;
+    }
   }
 
   Future<void> _pickCheckIn() async {
@@ -236,7 +280,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
         _checkOut = _checkIn.add(const Duration(days: 1));
       }
     });
-    _refreshAvailability();
+    _refreshAvailability(debounce: true);
   }
 
   Future<void> _pickCheckOut() async {
@@ -251,7 +295,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
     );
     if (selected == null || !mounted) return;
     setState(() => _checkOut = _dateOnly(selected));
-    _refreshAvailability();
+    _refreshAvailability(debounce: true);
   }
 
   Widget _datePickerTheme(BuildContext context, Widget? child) => Theme(
@@ -269,18 +313,29 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   );
 
   void _changeAdults(int delta) {
-    setState(() => _adults = (_adults + delta).clamp(1, 12));
+    setState(() => _adults = (_adults + delta).clamp(1, _room?.capacity ?? 12));
   }
 
   void _changeChildren(int delta) {
-    setState(() => _children = (_children + delta).clamp(0, 10));
+    final maxChildren = math.max(0, (_room?.capacity ?? 12) - _adults);
+    setState(() => _children = (_children + delta).clamp(0, maxChildren));
   }
 
-  void _book() {
+  Future<void> _book() async {
     final room = _room;
     if (room == null || !_canBook) return;
     if (FirebaseAuth.instance.currentUser == null) {
       _showLoginMessage('Please log in before booking this room.');
+      return;
+    }
+    final available = await _refreshAvailability();
+    if (!mounted) return;
+    if (available != true) {
+      _showLoginMessage(
+        available == false
+            ? 'Aa dates available nathi'
+            : 'Availability could not be checked. Please retry.',
+      );
       return;
     }
     Navigator.of(context).push<void>(
@@ -456,6 +511,9 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                     unitsLeft: room.unitsLeft,
                     available: _statusAvailable,
                     checking: _checkingAvailability,
+                    errorMessage: _availabilityError,
+                    maxGuests: room.capacity ?? 12,
+                    onRetry: _refreshAvailability,
                     compact: !wide,
                     onCheckIn: _pickCheckIn,
                     onCheckOut: _pickCheckOut,
@@ -492,15 +550,16 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
 
           slivers.add(
             SliverToBoxAdapter(
-              child: SizedBox(
-                height: media.padding.bottom + (width < 400 ? 166 : 100) + 16,
-              ),
+              child: SizedBox(height: media.padding.bottom + 100 + 16),
             ),
           );
 
           return Scaffold(
             backgroundColor: AppColors.cream,
-            body: CustomScrollView(slivers: slivers),
+            body: SafeArea(
+              bottom: false,
+              child: CustomScrollView(slivers: slivers),
+            ),
             bottomNavigationBar: room == null || _notFound
                 ? null
                 : StickyBookingBar(

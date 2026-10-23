@@ -14,6 +14,9 @@ class AvailabilityCard extends StatelessWidget {
     required this.unitsLeft,
     required this.available,
     required this.checking,
+    required this.maxGuests,
+    required this.onRetry,
+    this.errorMessage,
     required this.compact,
     required this.onCheckIn,
     required this.onCheckOut,
@@ -30,6 +33,9 @@ class AvailabilityCard extends StatelessWidget {
   final int? unitsLeft;
   final bool available;
   final bool checking;
+  final int maxGuests;
+  final String? errorMessage;
+  final VoidCallback onRetry;
   final bool compact;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
@@ -38,12 +44,18 @@ class AvailabilityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = available ? AppColors.darkGold : AppColors.greyText;
+    final statusColor = errorMessage != null
+        ? AppColors.greyText
+        : available
+        ? const Color(0xFF25804B)
+        : const Color(0xFFB53838);
     final status = checking
         ? 'Checking availability'
+        : errorMessage != null
+        ? 'Availability check failed'
         : available
         ? 'Available'
-        : 'Not available';
+        : 'Not available for selected dates';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -87,6 +99,7 @@ class AvailabilityCard extends StatelessWidget {
               label: 'Adults',
               count: adults,
               minimum: 1,
+              canIncrease: adults + children < maxGuests,
               onChanged: onAdultsChange,
             ),
             const SizedBox(height: 4),
@@ -94,6 +107,7 @@ class AvailabilityCard extends StatelessWidget {
               label: 'Children',
               count: children,
               minimum: 0,
+              canIncrease: adults + children < maxGuests,
               onChanged: onChildrenChange,
             ),
           ] else
@@ -104,6 +118,7 @@ class AvailabilityCard extends StatelessWidget {
                     label: 'Adults',
                     count: adults,
                     minimum: 1,
+                    canIncrease: adults + children < maxGuests,
                     onChanged: onAdultsChange,
                   ),
                 ),
@@ -113,6 +128,7 @@ class AvailabilityCard extends StatelessWidget {
                     label: 'Children',
                     count: children,
                     minimum: 0,
+                    canIncrease: adults + children < maxGuests,
                     onChanged: onChildrenChange,
                   ),
                 ),
@@ -121,13 +137,18 @@ class AvailabilityCard extends StatelessWidget {
           const Divider(height: 22, color: AppColors.border),
           Row(
             children: [
-              Icon(
-                checking || !available
-                    ? Icons.info_outline
-                    : Icons.check_circle_outline,
-                color: checking ? AppColors.navy : statusColor,
-                size: 19,
-              ),
+              if (checking)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  !available ? Icons.info_outline : Icons.check_circle_outline,
+                  color: statusColor,
+                  size: 19,
+                ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
@@ -153,6 +174,30 @@ class AvailabilityCard extends StatelessWidget {
               ),
             ],
           ),
+          if (errorMessage != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    errorMessage!,
+                    style: const TextStyle(
+                      color: AppColors.greyText,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
+          ],
+          if (adults + children > maxGuests) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Max $maxGuests guests',
+              style: const TextStyle(color: AppColors.greyText, fontSize: 11),
+            ),
+          ],
           if (available && unitsLeft != null && unitsLeft! <= 2) ...[
             const SizedBox(height: 7),
             Text(
@@ -256,12 +301,14 @@ class _GuestStepper extends StatelessWidget {
     required this.label,
     required this.count,
     required this.minimum,
+    required this.canIncrease,
     required this.onChanged,
   });
 
   final String label;
   final int count;
   final int minimum;
+  final bool canIncrease;
   final ValueChanged<int> onChanged;
 
   @override
@@ -286,7 +333,7 @@ class _GuestStepper extends StatelessWidget {
       ),
       IconButton(
         visualDensity: VisualDensity.compact,
-        onPressed: () => onChanged(1),
+        onPressed: canIncrease ? () => onChanged(1) : null,
         icon: const Icon(Icons.add_circle_outline, color: AppColors.darkGold),
       ),
     ],

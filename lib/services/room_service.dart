@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/room.dart';
+import '../core/image_utils.dart';
 
 class RoomService {
   RoomService({SupabaseClient? client})
@@ -19,7 +20,9 @@ class RoomService {
     if (row == null) return null;
 
     try {
-      return Room.fromJson(row);
+      final room = Room.fromJson(row);
+      _logRoomImages(room);
+      return room;
     } catch (error, stack) {
       debugPrint('Could not parse room $roomId: $error\n$stack');
       rethrow;
@@ -34,18 +37,16 @@ class RoomService {
     try {
       final rows = await _client
           .from('bookings')
-          .select('room_id')
+          .select('id')
           .eq('room_id', roomId)
-          .neq('booking_status', 'cancelled')
+          .eq('booking_status', 'confirmed')
           .lt('check_in', _dateOnly(checkOut))
           .gt('check_out', _dateOnly(checkIn))
           .limit(1);
       return rows.isNotEmpty;
     } catch (error) {
-      if (kDebugMode) {
-        debugPrint('Room booking conflict check ignored: $error');
-      }
-      return false;
+      if (kDebugMode) debugPrint('Room availability check failed: $error');
+      rethrow;
     }
   }
 
@@ -95,12 +96,22 @@ class RoomService {
     final rooms = <Room>[];
     for (final row in rows) {
       try {
-        rooms.add(Room.fromJson(row));
+        final room = Room.fromJson(row);
+        _logRoomImages(room);
+        rooms.add(room);
       } catch (error, stack) {
         debugPrint('Skipping invalid room row: $row\n$error\n$stack');
       }
     }
     return rooms;
+  }
+
+  void _logRoomImages(Room room) {
+    if (!kDebugMode) return;
+    final number = room.roomNumber ?? room.id;
+    debugPrint('ROOM $number images: ${room.imageUrls}');
+    final resolved = room.imageUrls.map(resolveImageUrl).toList();
+    debugPrint('ROOM $number resolved image URLs: $resolved');
   }
 
   Future<int> debugRoomRowCount() async {

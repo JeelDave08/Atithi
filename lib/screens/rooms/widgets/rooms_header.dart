@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/image_utils.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_network_image.dart';
 
 class RoomsHeader extends StatelessWidget {
   const RoomsHeader({this.imageUrl, super.key});
@@ -15,27 +15,8 @@ class RoomsHeader extends StatelessWidget {
     child: Stack(
       children: [
         Positioned.fill(
-          child: imageUrl != null && imageUrl!.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: optimizedImageUrl(imageUrl!),
-                  memCacheWidth: 800,
-                  maxWidthDiskCache: 800,
-                  fit: BoxFit.cover,
-                  fadeInDuration: const Duration(milliseconds: 200),
-                  filterQuality: FilterQuality.low,
-                  placeholder: (_, _) =>
-                      const ColoredBox(color: AppColors.cream),
-                  errorWidget: (_, _, _) => const ColoredBox(
-                    color: AppColors.cream,
-                    child: Center(
-                      child: Icon(
-                        Icons.bed_outlined,
-                        color: AppColors.greyText,
-                        size: 36,
-                      ),
-                    ),
-                  ),
-                )
+          child: imageUrl != null && imageUrl!.trim().isNotEmpty
+              ? AppNetworkImage(url: imageUrl)
               : const _HeaderFallback(),
         ),
         const Positioned.fill(
@@ -59,10 +40,13 @@ class RoomsHeader extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _circle(
-                      Icons.arrow_back,
-                      () => Navigator.maybePop(context),
-                    ),
+                    _circle(Icons.arrow_back, () {
+                      if (Navigator.of(context).canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    }),
                     const Spacer(),
                     Container(
                       width: 46,
@@ -166,8 +150,8 @@ class RoomsHeader extends StatelessWidget {
       customBorder: const CircleBorder(),
       onTap: onTap,
       child: SizedBox(
-        width: 38,
-        height: 38,
+        width: 48,
+        height: 48,
         child: Icon(icon, color: Colors.white, size: 20),
       ),
     ),

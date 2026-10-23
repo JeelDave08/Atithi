@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/image_utils.dart';
 import '../../../models/room.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_network_image.dart';
 
 class RoomGallery extends StatefulWidget {
   const RoomGallery({required this.room, super.key});
@@ -30,16 +30,15 @@ class _RoomGalleryState extends State<RoomGallery> {
     final nextIndex = index + 1;
     if (nextIndex >= urls.length) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      precacheImage(
-        CachedNetworkImageProvider(
-          optimizedImageUrl(urls[nextIndex]),
-          maxWidth: 800,
-        ),
-        context,
-        onError: (_, _) {},
-      );
+    final nextUrl = resolveImageUrl(urls[nextIndex]);
+    if (nextUrl == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!context.mounted) return;
+      try {
+        await precacheImage(NetworkImage(nextUrl), context);
+      } catch (error) {
+        debugPrint('Room gallery precache failed: $nextUrl | $error');
+      }
     });
   }
 
@@ -73,7 +72,7 @@ class _RoomGalleryState extends State<RoomGallery> {
               fit: StackFit.expand,
               children: [
                 if (images.isEmpty)
-                  const _ImagePlaceholder(showIcon: true)
+                  const AppNetworkImage(url: null)
                 else
                   PageView.builder(
                     controller: _pageController,
@@ -81,7 +80,7 @@ class _RoomGalleryState extends State<RoomGallery> {
                     onPageChanged: _onPageChanged,
                     itemBuilder: (context, index) => GestureDetector(
                       onTap: _openFullScreen,
-                      child: _cachedImage(images[index]),
+                      child: _networkImage(images[index]),
                     ),
                   ),
                 if (badge != null && badge.trim().isNotEmpty)
@@ -207,7 +206,7 @@ class _RoomGalleryState extends State<RoomGallery> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(7),
-                      child: _cachedImage(images[index]),
+                      child: _networkImage(images[index]),
                     ),
                   ),
                 ),
@@ -219,16 +218,7 @@ class _RoomGalleryState extends State<RoomGallery> {
     );
   }
 
-  Widget _cachedImage(String url) => CachedNetworkImage(
-    imageUrl: optimizedImageUrl(url),
-    memCacheWidth: 800,
-    maxWidthDiskCache: 800,
-    fadeInDuration: const Duration(milliseconds: 200),
-    filterQuality: FilterQuality.low,
-    fit: BoxFit.cover,
-    placeholder: (_, _) => const _ImagePlaceholder(),
-    errorWidget: (_, _, _) => const _ImagePlaceholder(showIcon: true),
-  );
+  Widget _networkImage(String url) => AppNetworkImage(url: url);
 }
 
 class FullScreenRoomGallery extends StatefulWidget {
@@ -271,19 +261,9 @@ class _FullScreenRoomGalleryState extends State<FullScreenRoomGallery> {
               child: InteractiveViewer(
                 minScale: 1,
                 maxScale: 4,
-                child: CachedNetworkImage(
-                  imageUrl: optimizedImageUrl(
-                    widget.images[index],
-                    width: 1600,
-                  ),
-                  memCacheWidth: 1600,
-                  maxWidthDiskCache: 1600,
-                  fadeInDuration: const Duration(milliseconds: 200),
-                  filterQuality: FilterQuality.low,
+                child: AppNetworkImage(
+                  url: widget.images[index],
                   fit: BoxFit.contain,
-                  placeholder: (_, _) => const _ImagePlaceholder(),
-                  errorWidget: (_, _, _) =>
-                      const _ImagePlaceholder(showIcon: true),
                 ),
               ),
             ),
@@ -329,24 +309,5 @@ class _ArrowButton extends StatelessWidget {
       icon: Icon(icon, color: AppColors.navy),
       visualDensity: VisualDensity.compact,
     ),
-  );
-}
-
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder({this.showIcon = false});
-  final bool showIcon;
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.cream,
-    child: showIcon
-        ? const Center(
-            child: Icon(
-              Icons.bed_outlined,
-              color: AppColors.greyText,
-              size: 38,
-            ),
-          )
-        : null,
   );
 }

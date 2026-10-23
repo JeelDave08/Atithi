@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 class Room {
   const Room({
     required this.id,
     this.propertyId,
+    this.roomNumber,
     required this.roomName,
     this.roomType,
     this.description,
@@ -22,6 +25,7 @@ class Room {
 
   final String id;
   final String? propertyId;
+  final String? roomNumber;
   final String? roomName;
   final String? roomType;
   final String? description;
@@ -42,13 +46,16 @@ class Room {
   factory Room.fromJson(Map<String, dynamic> json) => Room(
     id: json['id']?.toString() ?? '',
     propertyId: json['property_id']?.toString(),
+    roomNumber: json['room_number']?.toString(),
     roomName: json['room_name']?.toString() ?? 'Room',
     roomType: json['room_type']?.toString(),
     description: json['description']?.toString(),
     pricePerNight: _toDouble(json['price_per_night']),
     capacity: _toInt(json['capacity']),
     amenities: _stringList(json['amenities']),
-    imageUrls: _stringList(json['image_urls']),
+    imageUrls: _stringList(
+      json['image_urls'] ?? json['images'] ?? json['image_url'],
+    ),
     status: json['status']?.toString(),
     isPublished: json['is_published'] is bool
         ? json['is_published'] as bool
@@ -74,6 +81,27 @@ class Room {
     return num.tryParse(value.toString())?.toInt();
   }
 
-  static List<String> _stringList(Object? value) =>
-      value is Iterable ? value.whereType<String>().toList() : const [];
+  static List<String> _stringList(Object? value) {
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return const [];
+      if (trimmed.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is Iterable) return _cleanStrings(decoded);
+        } on FormatException {
+          // Treat malformed JSON as a single storage path/URL.
+        }
+      }
+      return [trimmed];
+    }
+    if (value is Iterable) return _cleanStrings(value);
+    return const [];
+  }
+
+  static List<String> _cleanStrings(Iterable values) => values
+      .whereType<String>()
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
 }

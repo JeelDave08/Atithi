@@ -9,12 +9,13 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../models/room.dart';
 import '../../services/room_service.dart';
+import '../../providers/rooms_provider.dart';
+import '../../navigation/room_navigation.dart';
 import '../../theme/app_colors.dart';
 import '../../features/home/widgets/reveal_on_scroll.dart';
-import '../room_details/room_details_screen.dart';
-import '../booking/booking_screen.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
+import 'widgets/room_search_bar.dart';
 import 'widgets/rooms_header.dart';
 import 'widgets/why_choose_atithi_card.dart';
 
@@ -38,17 +39,17 @@ class RoomsScreen extends ConsumerStatefulWidget {
 
 class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   static bool _didDebugRowCheck = false;
-  static const _pageSize = 20;
 
   final _service = RoomService();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  String searchQuery = '';
   List<Room> _rooms = [];
   List<String> _categories = [];
   Set<String> _favorites = {};
   final Set<String> _amenities = {};
   bool _loading = true;
-  bool _loadingMore = false;
-  bool _hasMore = true;
   Object? _error;
   String? _debugError;
   String _category = 'All';
@@ -59,7 +60,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
     if (kDebugMode && !_didDebugRowCheck) {
       _didDebugRowCheck = true;
       unawaited(_debugRoomRowCount());
@@ -69,22 +69,79 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
 
   @override
   void dispose() {
-    _scrollController
-      ..removeListener(_onScroll)
-      ..dispose();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scrollController.hasClients ||
-        _loading ||
-        _loadingMore ||
-        !_hasMore) {
-      return;
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() => searchQuery = value.trim());
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() => searchQuery = '');
+  }
+
+  List<Room> applyFilters(List<Room> rooms) {
+    final rawQuery = searchQuery.toLowerCase().trim();
+    final words = rawQuery
+        .split(RegExp(r'\s+'))
+        .map((word) => word.replaceAll(RegExp(r'[-\s]'), ''))
+        .where((word) => word.isNotEmpty)
+        .toList();
+    final filtered = rooms.where((room) {
+      if (_category != 'All' && room.roomType != _category) return false;
+      final price = room.pricePerNight ?? 0;
+      if (_price == 'Under 4000' && price >= 4000) return false;
+      if (_price == '4000-6000' && (price < 4000 || price > 6000)) return false;
+      if (_price == '6000+' && price <= 6000) return false;
+      final capacity = room.capacity ?? 0;
+      if (_capacity == '1-2' && (capacity < 1 || capacity > 2)) return false;
+      if (_capacity == '3-4' && (capacity < 3 || capacity > 4)) return false;
+      if (_capacity == '5+' && capacity < 5) return false;
+      if (_amenities.isNotEmpty &&
+          !_amenities.every((amenity) => room.amenities.contains(amenity))) {
+        return false;
+      }
+      if (rawQuery.isEmpty) return true;
+      final searchable =
+          [
+                room.roomNumber,
+                room.roomName,
+                room.roomType,
+                room.description,
+                ...room.amenities,
+                room.bedInfo,
+                if (room.capacity != null) '${room.capacity} guests',
+                if (room.pricePerNight != null)
+                  room.pricePerNight!.toStringAsFixed(0),
+              ]
+              .whereType<String>()
+              .join(' ')
+              .toLowerCase()
+              .replaceAll(RegExp(r'[-\s]'), '');
+      return words.every(searchable.contains);
+    }).toList();
+    switch (_sort) {
+      case 'Price Low to High':
+        filtered.sort(
+          (a, b) => (a.pricePerNight ?? 0).compareTo(b.pricePerNight ?? 0),
+        );
+      case 'Price High to Low':
+        filtered.sort(
+          (a, b) => (b.pricePerNight ?? 0).compareTo(a.pricePerNight ?? 0),
+        );
+      case 'Rating':
+        filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
     }
-    if (_scrollController.position.extentAfter < 600) {
-      unawaited(_loadMore());
-    }
+    return filtered;
   }
 
   Future<void> _debugRoomRowCount() async {
@@ -98,24 +155,15 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     }
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool refresh = false}) async {
     setState(() {
       _loading = true;
-      _loadingMore = false;
-      _hasMore = true;
     });
     try {
+      if (refresh) ref.invalidate(roomsProvider);
       final results = await Future.wait([
         _service.fetchCategories(),
-        _service.fetchRooms(
-          roomType: _category,
-          priceRange: _price,
-          capacityRange: _capacity,
-          amenities: _amenities,
-          sort: _sort,
-          from: 0,
-          to: _pageSize - 1,
-        ),
+        ref.read(roomsProvider.future),
       ]);
       final user = FirebaseAuth.instance.currentUser;
       final favorites = user == null
@@ -125,7 +173,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       setState(() {
         _categories = results[0] as List<String>;
         _rooms = results[1] as List<Room>;
-        _hasMore = _rooms.length == _pageSize;
         _favorites = favorites;
         _error = null;
         _debugError = null;
@@ -141,32 +188,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         }
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_loading || _loadingMore || !_hasMore || _rooms.isEmpty) return;
-    setState(() => _loadingMore = true);
-    try {
-      final nextRooms = await _service.fetchRooms(
-        roomType: _category,
-        priceRange: _price,
-        capacityRange: _capacity,
-        amenities: _amenities,
-        sort: _sort,
-        from: _rooms.length,
-        to: _rooms.length + _pageSize - 1,
-      );
-      if (!mounted) return;
-      setState(() {
-        _rooms = [..._rooms, ...nextRooms];
-        _hasMore = nextRooms.length == _pageSize;
-        _loadingMore = false;
-      });
-    } catch (error, stack) {
-      debugPrint('Rooms pagination error: $error\n$stack');
-      if (!mounted) return;
-      setState(() => _loadingMore = false);
     }
   }
 
@@ -246,127 +267,157 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     final textScale = media.textScaler.scale(1).clamp(1.0, 1.15).toDouble();
     return MediaQuery(
       data: media.copyWith(textScaler: TextScaler.linear(textScale)),
-      child: Scaffold(
-        backgroundColor: AppColors.cream,
-        body: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            color: AppColors.darkGold,
-            onRefresh: _load,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final maxWidth = constraints.maxWidth;
-                final columns = maxWidth < 600
-                    ? 1
-                    : maxWidth < 900
-                    ? 2
-                    : 3;
-                final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
+      child: PopScope<Object?>(
+        canPop: Navigator.of(context).canPop(),
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) context.go('/home');
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.cream,
+          resizeToAvoidBottomInset: true,
+          body: SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
+              color: AppColors.darkGold,
+              onRefresh: () => _load(refresh: true),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxWidth = constraints.maxWidth;
+                  final columns = maxWidth < 600
+                      ? 1
+                      : maxWidth < 900
+                      ? 2
+                      : 3;
+                  final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
 
-                return CustomScrollView(
-                  controller: _scrollController,
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: RoomsHeader(
-                        imageUrl:
-                            _rooms.isNotEmpty &&
-                                _rooms.first.imageUrls.isNotEmpty
-                            ? _rooms.first.imageUrls.first
-                            : null,
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          maxWidth > 700 ? 24 : 14,
-                          12,
-                          maxWidth > 700 ? 24 : 14,
-                          12,
-                        ),
-                        child: RoomFilterBar(
-                          categories: _categories,
-                          category: _category,
-                          price: _price,
-                          type: _category == 'All' ? null : _category,
-                          capacity: _capacity,
-                          amenities: _amenities,
-                          onCategory: (category) {
-                            setState(() => _category = category);
-                            _load();
-                          },
-                          onFilter: _apply,
-                          onClear: _clear,
+                  return CustomScrollView(
+                    controller: _scrollController,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: RoomsHeader(
+                          imageUrl:
+                              _rooms.isNotEmpty &&
+                                  _rooms.first.imageUrls.isNotEmpty
+                              ? _rooms.first.imageUrls.first
+                              : null,
                         ),
                       ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _buildResultsRow(maxWidth, contentWidth),
-                    ),
-                    if (_loading)
-                      SliverToBoxAdapter(
-                        child: _skeletonGrid(maxWidth, columns, contentWidth),
-                      )
-                    else if (_error != null)
-                      SliverToBoxAdapter(
-                        child: _state(
-                          Icons.wifi_off,
-                          'Could not load rooms',
-                          'Please check your connection and try again.',
-                          ElevatedButton(
-                            onPressed: _load,
-                            child: const Text('Retry'),
-                          ),
-                          debugDetails: kDebugMode ? _debugError : null,
-                        ),
-                      )
-                    else if (_rooms.isEmpty)
-                      SliverToBoxAdapter(
-                        child: _state(
-                          Icons.hotel_outlined,
-                          'No rooms found',
-                          'Try changing or clearing your filters.',
-                          OutlinedButton(
-                            onPressed: _clear,
-                            child: const Text('Clear filters'),
-                          ),
-                        ),
-                      )
-                    else
-                      _buildRoomsGrid(maxWidth, contentWidth, columns),
-                    if (_loadingMore)
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.darkGold,
+                          padding: EdgeInsets.fromLTRB(
+                            maxWidth > 700 ? 24 : 16,
+                            8,
+                            maxWidth > 700 ? 24 : 16,
+                            0,
+                          ),
+                          child: RoomSearchBar(
+                            controller: _searchController,
+                            onChanged: _onSearchChanged,
+                            onClear: _clearSearch,
+                          ),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            maxWidth > 700 ? 24 : 14,
+                            12,
+                            maxWidth > 700 ? 24 : 14,
+                            12,
+                          ),
+                          child: RoomFilterBar(
+                            categories: _categories,
+                            category: _category,
+                            price: _price,
+                            type: _category == 'All' ? null : _category,
+                            capacity: _capacity,
+                            amenities: _amenities,
+                            onCategory: (category) {
+                              setState(() => _category = category);
+                              _load();
+                            },
+                            onFilter: _apply,
+                            onClear: _clear,
+                          ),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _buildResultsRow(maxWidth, contentWidth),
+                      ),
+                      if (_loading)
+                        SliverToBoxAdapter(
+                          child: _skeletonGrid(maxWidth, columns, contentWidth),
+                        )
+                      else if (_error != null)
+                        SliverToBoxAdapter(
+                          child: _state(
+                            Icons.wifi_off,
+                            'Could not load rooms',
+                            'Please check your connection and try again.',
+                            ElevatedButton(
+                              onPressed: _load,
+                              child: const Text('Retry'),
+                            ),
+                            debugDetails: kDebugMode ? _debugError : null,
+                          ),
+                        )
+                      else if (applyFilters(_rooms).isEmpty)
+                        SliverToBoxAdapter(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: searchQuery.isNotEmpty
+                                ? _searchEmptyState()
+                                : _state(
+                                    Icons.hotel_outlined,
+                                    'No rooms found',
+                                    'Try changing or clearing your filters.',
+                                    OutlinedButton(
+                                      onPressed: _clear,
+                                      child: const Text('Clear filters'),
+                                    ),
+                                  ),
+                          ),
+                        )
+                      else
+                        SliverToBoxAdapter(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            switchInCurve: Curves.easeIn,
+                            switchOutCurve: Curves.easeOut,
+                            child: _buildRoomsGrid(
+                              maxWidth,
+                              contentWidth,
+                              columns,
+                              applyFilters(_rooms),
+                            ),
+                          ),
+                        ),
+                      SliverToBoxAdapter(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: contentWidth),
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
+                              child: WhyChooseAtithiCard(),
                             ),
                           ),
                         ),
                       ),
-                    SliverToBoxAdapter(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: contentWidth),
-                          child: const Padding(
-                            padding: EdgeInsets.fromLTRB(14, 26, 14, 25),
-                            child: WhyChooseAtithiCard(),
-                          ),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: MediaQuery.paddingOf(context).bottom + 90,
                         ),
                       ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: MediaQuery.paddingOf(context).bottom + 63,
-                      ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
           ),
+          bottomNavigationBar: const _RoomsNavigation(),
         ),
-        bottomNavigationBar: const _RoomsNavigation(),
       ),
     );
   }
@@ -388,9 +439,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                maxWidth < 360
-                    ? '${_rooms.length} Rooms'
-                    : '${_rooms.length} Rooms Available',
+                searchQuery.isNotEmpty
+                    ? '${applyFilters(_rooms).length} Rooms found for "$searchQuery"'
+                    : maxWidth < 360
+                    ? '${applyFilters(_rooms).length} Rooms'
+                    : '${applyFilters(_rooms).length} Rooms Available',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -448,44 +501,94 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     ),
   );
 
-  Widget _buildRoomsGrid(double maxWidth, double contentWidth, int columns) =>
-      SliverList(
-        delegate: SliverChildBuilderDelegate((context, rowIndex) {
-          final firstRoomIndex = rowIndex * columns;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: contentWidth),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: maxWidth > 700 ? 24 : 14,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var column = 0; column < columns; column++) ...[
-                        if (column > 0) const SizedBox(width: 12),
-                        Expanded(
-                          child: firstRoomIndex + column >= _rooms.length
-                              ? const SizedBox.shrink()
-                              : RevealOnScroll(
-                                  delay: Duration(milliseconds: rowIndex * 120),
-                                  child: _buildRoomCard(
-                                    context,
-                                    _rooms[firstRoomIndex + column],
-                                  ),
+  Widget _buildRoomsGrid(
+    double maxWidth,
+    double contentWidth,
+    int columns,
+    List<Room> rooms,
+  ) => Column(
+    key: ValueKey(rooms.map((room) => room.id).join(',')),
+    children: [
+      for (
+        var rowIndex = 0;
+        rowIndex < (rooms.length / columns).ceil();
+        rowIndex++
+      )
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: contentWidth),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: maxWidth > 700 ? 24 : 14,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var column = 0; column < columns; column++) ...[
+                      if (column > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: rowIndex * columns + column >= rooms.length
+                            ? const SizedBox.shrink()
+                            : RevealOnScroll(
+                                delay: Duration(milliseconds: rowIndex * 120),
+                                child: _buildRoomCard(
+                                  context,
+                                  rooms[rowIndex * columns + column],
                                 ),
-                        ),
-                      ],
+                              ),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
-          );
-        }, childCount: (_rooms.length / columns).ceil()),
-      );
+          ),
+        ),
+    ],
+  );
+
+  Widget _searchEmptyState() => Padding(
+    key: const ValueKey('search-empty'),
+    padding: const EdgeInsets.symmetric(vertical: 52, horizontal: 24),
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.search_off_rounded,
+            size: 46,
+            color: AppColors.darkGold,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No rooms found',
+            style: TextStyle(
+              color: AppColors.navy,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Try a different keyword or clear filters',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.greyText, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton(
+            onPressed: _clearSearch,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.darkGold,
+              side: const BorderSide(color: AppColors.gold),
+            ),
+            child: const Text('Clear Search'),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildRoomCard(BuildContext context, Room room) {
     final today = DateTime.now();
@@ -503,30 +606,21 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         room: room,
         isFavorite: _favorites.contains(room.id),
         onFavorite: () => _favorite(room),
-        onDetails: () => Navigator.push(
+        onDetails: () => openRoomDetails(
           context,
-          MaterialPageRoute<void>(
-            builder: (_) => RoomDetailsScreen(
-              roomId: room.id,
-              room: room,
-              checkIn: widget.checkIn,
-              checkOut: widget.checkOut,
-              adults: widget.adults,
-              children: widget.children,
-            ),
-          ),
+          room,
+          checkIn: widget.checkIn,
+          checkOut: widget.checkOut,
+          adults: widget.adults,
+          children: widget.children,
         ),
-        onBook: () => Navigator.push(
+        onBook: () => openRoomBooking(
           context,
-          MaterialPageRoute<void>(
-            builder: (_) => BookingScreen(
-              room: room,
-              checkIn: checkIn,
-              checkOut: checkOut,
-              adults: widget.adults,
-              children: widget.children,
-            ),
-          ),
+          room,
+          checkIn: checkIn,
+          checkOut: checkOut,
+          adults: widget.adults,
+          children: widget.children,
         ),
       ),
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -71,13 +70,14 @@ class _PropertyScreenState extends State<PropertyScreen> {
                                 itemCount: 10,
                                 onPageChanged: (i) =>
                                     setState(() => _photo = i),
-                                itemBuilder: (c, i) => CachedNetworkImage(
-                                  imageUrl:
-                                      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=900&sig=$i',
+                                itemBuilder: (c, i) => Image.network(
+                                  'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=900&sig=$i',
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) =>
-                                      const _PropertyPhotoFallback(),
-                                  errorWidget: (context, url, error) =>
+                                  loadingBuilder: (context, child, progress) =>
+                                      progress == null
+                                      ? child
+                                      : const _PropertyPhotoFallback(),
+                                  errorBuilder: (context, error, stack) =>
                                       const _PropertyPhotoFallback(),
                                 ),
                               ),
@@ -240,7 +240,10 @@ class _PropertyScreenState extends State<PropertyScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 10, color: Palette.grey.withValues(alpha: .8)),
+          style: TextStyle(
+            fontSize: 10,
+            color: Palette.grey.withValues(alpha: .8),
+          ),
         ),
         const SizedBox(height: 5),
         Text(

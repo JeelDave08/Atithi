@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../atithi_home_screen.dart';
@@ -281,11 +280,13 @@ class LegacyHomeScreen extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CachedNetworkImage(
-              imageUrl: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=700',
+            Image.network(
+              'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=700',
               fit: BoxFit.cover,
-              placeholder: (context, url) => const _StayImageFallback(),
-              errorWidget: (context, url, error) => const _StayImageFallback(),
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : const _StayImageFallback(),
+              errorBuilder: (context, error, stack) =>
+                  const _StayImageFallback(),
             ),
             const Positioned(
               top: 60,

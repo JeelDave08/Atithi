@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/image_utils.dart';
 import '../../../models/room.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_network_image.dart';
 
 class RoomImageCarousel extends StatefulWidget {
   const RoomImageCarousel({
@@ -28,14 +28,15 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
     final nextIndex = index + 1;
     if (nextIndex >= urls.length) return;
 
-    final nextUrl = optimizedImageUrl(urls[nextIndex]);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      precacheImage(
-        CachedNetworkImageProvider(nextUrl, maxWidth: 800),
-        context,
-        onError: (_, _) {},
-      );
+    final nextUrl = resolveImageUrl(urls[nextIndex]);
+    if (nextUrl == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!context.mounted) return;
+      try {
+        await precacheImage(NetworkImage(nextUrl), context);
+      } catch (error) {
+        debugPrint('Room image precache failed: $nextUrl | $error');
+      }
     });
   }
 
@@ -50,19 +51,8 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
           PageView.builder(
             itemCount: urls.isEmpty ? 1 : urls.length,
             onPageChanged: (v) => _onPageChanged(v, urls),
-            itemBuilder: (_, i) => urls.isEmpty
-                ? const _RoomImagePlaceholder(showBedIcon: true)
-                : CachedNetworkImage(
-                    imageUrl: optimizedImageUrl(urls[i]),
-                    memCacheWidth: 800,
-                    maxWidthDiskCache: 800,
-                    fit: BoxFit.cover,
-                    fadeInDuration: const Duration(milliseconds: 200),
-                    filterQuality: FilterQuality.low,
-                    placeholder: (_, _) => const _RoomImagePlaceholder(),
-                    errorWidget: (_, _, _) =>
-                        const _RoomImagePlaceholder(showBedIcon: true),
-                  ),
+            itemBuilder: (_, i) =>
+                AppNetworkImage(url: urls.isEmpty ? null : urls[i]),
           ),
           if (widget.room.badge != null && widget.room.badge!.trim().isNotEmpty)
             Positioned(
@@ -122,7 +112,9 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
                         width: index == page ? 20 : 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: index == page ? AppColors.gold : Colors.white70,
+                          color: index == page
+                              ? AppColors.gold
+                              : Colors.white70,
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -143,9 +135,16 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.image_outlined, color: AppColors.gold, size: 13),
+                    const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.gold,
+                      size: 13,
+                    ),
                     const SizedBox(width: 4),
-                    Text('${page + 1}/${urls.length}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                    Text(
+                      '${page + 1}/${urls.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
                   ],
                 ),
               ),
@@ -154,23 +153,4 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
       ),
     );
   }
-}
-
-class _RoomImagePlaceholder extends StatelessWidget {
-  const _RoomImagePlaceholder({this.showBedIcon = false});
-  final bool showBedIcon;
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.cream,
-    child: showBedIcon
-        ? const Center(
-            child: Icon(
-              Icons.bed_outlined,
-              color: AppColors.greyText,
-              size: 36,
-            ),
-          )
-        : null,
-  );
 }
