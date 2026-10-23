@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'widgets/auto_slide_rooms.dart';
+
 import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -298,7 +300,7 @@ class PropertyContentRepository {
     try {
       final rows = await _supabase
           .from('bookings')
-          .select('*, rooms(*)')
+          .select('*, rooms(room_number, images)')
           .eq('firebase_uid', user.uid)
           .order('created_at', ascending: false);
       return rows.map((row) => Map<String, dynamic>.from(row)).toList();
@@ -1407,10 +1409,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
       const SizedBox(height: 8),
       Text(
         'Everything you need for a comfortable stay.',
-        style: GoogleFonts.dmSans(
-          color: AppColors.secondaryText,
-          fontSize: 14,
-        ),
+        style: GoogleFonts.dmSans(color: AppColors.secondaryText, fontSize: 14),
       ),
     ],
   );
@@ -1419,9 +1418,8 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
     padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
     physics: const NeverScrollableScrollPhysics(),
     itemCount: 6,
-    separatorBuilder: (_, index) => index == 0
-        ? const SizedBox(height: 20)
-        : const SizedBox(height: 14),
+    separatorBuilder: (_, index) =>
+        index == 0 ? const SizedBox(height: 20) : const SizedBox(height: 14),
     itemBuilder: (context, index) {
       if (index == 0) return _buildIntro(property);
       return const _ServiceCardSkeleton();
@@ -1468,11 +1466,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.wifi_off_rounded,
-            size: 48,
-            color: AppColors.gold,
-          ),
+          const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.gold),
           const SizedBox(height: 16),
           Text(
             'Could not load services',
@@ -1500,10 +1494,7 @@ class _PropertyServicesScreenState extends State<PropertyServicesScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: const Text('Try again'),
           ),
@@ -2123,11 +2114,12 @@ class _PropertyBookingsScreenState extends State<PropertyBookingsScreen> {
                       final checkIn = _bookingValue(booking, 'check_in');
                       final checkOut = _bookingValue(booking, 'check_out');
                       final total = _bookingValue(booking, 'total_amount');
-                      final statusColor = status?.toLowerCase() == 'confirmed'
-                          ? AppColors.darkGold
-                          : status?.toLowerCase() == 'cancelled'
-                          ? AppColors.greyText
-                          : AppColors.navy;
+                      final statusColor = switch (status?.toLowerCase()) {
+                        'confirmed' => const Color(0xFF25804B),
+                        'cancelled' || 'failed' => const Color(0xFFB53838),
+                        'pending' => const Color(0xFFE08A24),
+                        _ => AppColors.greyText,
+                      };
                       return Container(
                         padding: const EdgeInsets.all(17),
                         decoration: BoxDecoration(
@@ -3419,11 +3411,7 @@ class _ServiceCardState extends State<_ServiceCard> {
                     color: const Color(0xFFF6E7C3),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 26,
-                    color: const Color(0xFFB98A2C),
-                  ),
+                  child: Icon(icon, size: 26, color: const Color(0xFFB98A2C)),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -3464,10 +3452,7 @@ class _ServiceCardState extends State<_ServiceCard> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFF0D78F),
-                        AppColors.gold,
-                      ],
+                      colors: [Color(0xFFF0D78F), AppColors.gold],
                     ),
                   ),
                   child: const Icon(
@@ -3729,7 +3714,7 @@ String? _requiredField(
   if (input.isEmpty) return 'Please enter your $label.';
   if (input.length > maxLength) return 'Your $label is too long.';
   return null;
-  }
+}
 
 void _showBookingUnavailable(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(

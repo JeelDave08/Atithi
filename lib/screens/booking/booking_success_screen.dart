@@ -7,6 +7,7 @@ import '../../theme/app_colors.dart';
 
 class BookingSuccessData {
   const BookingSuccessData({
+    required this.bookingId,
     required this.roomName,
     required this.roomType,
     required this.checkIn,
@@ -16,6 +17,7 @@ class BookingSuccessData {
     required this.total,
   });
 
+  final String bookingId;
   final String roomName;
   final String roomType;
   final DateTime checkIn;
@@ -98,7 +100,7 @@ class _BookingSuccessScreenState extends State<BookingSuccessScreen>
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      'Booking Confirmed!',
+                      'Booking Request Received',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.playfairDisplay(
                         color: AppColors.navy,
@@ -108,7 +110,7 @@ class _BookingSuccessScreenState extends State<BookingSuccessScreen>
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Your stay is reserved. We look forward to welcoming you.',
+                      'Your booking is pending. Payment will be added in a later step.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.greyText, height: 1.45),
                     ),
@@ -124,6 +126,15 @@ class _BookingSuccessScreenState extends State<BookingSuccessScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            'Booking ID: ${data.bookingId}',
+                            style: const TextStyle(
+                              color: AppColors.darkGold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           Text(
                             data.roomName,
                             maxLines: 2,

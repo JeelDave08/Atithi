@@ -1,19 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/room.dart';
-import '../../core/responsive/app_container.dart';
-import '../../services/booking_service.dart';
+import '../../models/stay_search.dart';
+import '../../navigation/room_navigation.dart';
+import '../../screens/booking/models/booking_form_state.dart';
+import '../../services/booking_repository.dart';
 import '../../theme/app_colors.dart';
-import '../room_details/room_details_constants.dart';
 import 'booking_success_screen.dart';
 import 'widgets/booking_header.dart';
 import 'widgets/booking_room_summary.dart';
@@ -22,9 +23,11 @@ import 'widgets/booking_sticky_bar.dart';
 import 'widgets/booking_summary_card.dart';
 import 'widgets/booking_trust_strip.dart';
 import 'widgets/guest_count_stepper.dart';
+import 'widgets/guest_photo_picker.dart';
+import 'widgets/id_proof_picker.dart';
 
-class BookingScreen extends StatefulWidget {
-  const BookingScreen({
+class BookingFormScreen extends StatefulWidget {
+  const BookingFormScreen({
     required this.room,
     this.checkIn,
     this.checkOut,
@@ -40,16 +43,19 @@ class BookingScreen extends StatefulWidget {
   final int children;
 
   @override
-  State<BookingScreen> createState() => _BookingScreenState();
+  State<BookingFormScreen> createState() => _BookingFormScreenState();
 }
 
-class _BookingScreenState extends State<BookingScreen> {
+typedef BookingScreen = BookingFormScreen;
+
+class _BookingFormScreenState extends State<BookingFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
   final _nameKey = GlobalKey<FormFieldState<String>>();
   final _phoneKey = GlobalKey<FormFieldState<String>>();
   final _emailKey = GlobalKey<FormFieldState<String>>();
   final _guestAnchor = GlobalKey();
+  final _photoAnchor = GlobalKey();
   final _idAnchor = GlobalKey();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -59,7 +65,7 @@ class _BookingScreenState extends State<BookingScreen> {
   final _phoneFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _picker = ImagePicker();
-  final _service = BookingService();
+  final _service = BookingRepository();
 
   late DateTime _checkIn;
   late DateTime _checkOut;
@@ -68,26 +74,25 @@ class _BookingScreenState extends State<BookingScreen> {
   String _idType = 'Aadhaar Card';
   Uint8List? _guestPhoto;
   Uint8List? _idProof;
+  String _idProofExtension = 'jpg';
+  String? _photoError;
   bool _submitting = false;
   bool _autoValidate = false;
   String? _idError;
   String? _submissionError;
   String? _debugSubmissionError;
 
-  static const _idTypes = [
-    'Aadhaar Card',
-    'Passport',
-    'Driving Licence',
-    'Voter ID',
-  ];
-  static final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-  int get _nights => _checkOut.difference(_checkIn).inDays;
-  int get _capacity => (widget.room.capacity ?? 12).clamp(1, 99).toInt();
-  bool get _overCapacity =>
-      widget.room.capacity != null &&
-      _adults + _children > widget.room.capacity!;
-  double get _roomPrice => (widget.room.pricePerNight ?? 0) * _nights;
-  double get _total => _roomPrice * (1 + kTaxRate);
+  BookingFormState get _formState => BookingFormState(
+    room: widget.room,
+    checkIn: _checkIn,
+    checkOut: _checkOut,
+    adults: _adults,
+    children: _children,
+  );
+  int get _nights => _formState.nights;
+  int get _capacity => widget.room.maxGuests.clamp(1, 99).toInt();
+  bool get _overCapacity => !_formState.isWithinCapacity;
+  double get _total => _formState.total;
 
   @override
   void initState() {
@@ -101,7 +106,9 @@ class _BookingScreenState extends State<BookingScreen> {
       _checkOut = _checkIn.add(const Duration(days: 1));
     }
     _adults = widget.adults.clamp(1, _capacity).toInt();
-    _children = widget.children.clamp(0, 20).toInt();
+    _children = widget.children
+        .clamp(0, (_capacity - _adults).clamp(0, 20))
+        .toInt();
     _prefillGuest();
   }
 
@@ -155,6 +162,41 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _chooseImage({required bool forId}) async {
+    if (forId) {
+      try {
+        final picked = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+        );
+        if (picked.isEmpty) return;
+        final file = picked.first;
+        final extension = (file.extension ?? '').toLowerCase();
+        final size = await file.length();
+        if ((size ?? 0) > 5 * 1024 * 1024) {
+          setState(() => _idError = 'Choose an ID file smaller than 5 MB.');
+          return;
+        }
+        final bytes = await file.readAsBytes();
+        if (bytes.length > 5 * 1024 * 1024) {
+          setState(() => _idError = 'Choose an ID file smaller than 5 MB.');
+          return;
+        }
+        if (!{'jpg', 'jpeg', 'png', 'pdf'}.contains(extension)) {
+          setState(() => _idError = 'Choose a JPG, PNG, or PDF file.');
+          return;
+        }
+        setState(() {
+          _idProof = bytes;
+          _idProofExtension = extension == 'jpeg' ? 'jpg' : extension;
+          _idError = null;
+        });
+      } catch (error) {
+        if (mounted) {
+          _showMessage('Could not read that ID file. Please try again.');
+        }
+      }
+      return;
+    }
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: AppColors.cream,
@@ -203,27 +245,16 @@ class _BookingScreenState extends State<BookingScreen> {
       );
       if (image == null) return;
       final bytes = await image.readAsBytes();
-      final compressed = await FlutterImageCompress.compressWithList(
-        bytes,
-        minWidth: 1024,
-        minHeight: 1024,
-        quality: 80,
-        format: CompressFormat.jpeg,
-      );
-      if (forId && compressed.length > 5 * 1024 * 1024) {
+      if (bytes.length > 5 * 1024 * 1024) {
         if (mounted) {
-          setState(() => _idError = 'Please choose an ID image under 5 MB.');
+          setState(() => _photoError = 'Choose a photo smaller than 5 MB.');
         }
         return;
       }
       if (!mounted) return;
       setState(() {
-        if (forId) {
-          _idProof = compressed;
-          _idError = null;
-        } else {
-          _guestPhoto = compressed;
-        }
+        _guestPhoto = bytes;
+        _photoError = null;
       });
     } on PlatformException catch (error, stack) {
       if (kDebugMode) {
@@ -280,21 +311,37 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _confirm() async {
+    if (_submitting) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showMessage('Please log in to complete your booking.');
-      if (mounted) context.go('/auth');
+      if (mounted) {
+        openBooking(
+          context,
+          widget.room,
+          staySearch: StaySearch(
+            checkIn: _checkIn,
+            checkOut: _checkOut,
+            adults: _adults,
+            children: _children,
+          ),
+        );
+      }
       return;
     }
     setState(() {
       _autoValidate = true;
       _submissionError = null;
       _debugSubmissionError = null;
+      _photoError = _guestPhoto == null ? 'Please upload a guest photo.' : null;
       _idError = _idProof == null ? 'Please upload an ID proof.' : null;
     });
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) {
       await _focusFirstInvalid();
+      return;
+    }
+    if (_guestPhoto == null) {
+      await _scrollTo(_photoAnchor);
       return;
     }
     if (_idProof == null) {
@@ -308,14 +355,14 @@ class _BookingScreenState extends State<BookingScreen> {
     }
     setState(() => _submitting = true);
     try {
-      final conflict = await _service.hasConflict(
+      final conflict = await _service.checkAvailability(
         roomId: widget.room.id,
         checkIn: _checkIn,
         checkOut: _checkOut,
       );
       if (conflict) throw const BookingConflictException();
 
-      await _service.createBooking(
+      final result = await _service.createBooking(
         room: widget.room,
         guestName: _nameController.text,
         guestEmail: _emailController.text,
@@ -327,12 +374,14 @@ class _BookingScreenState extends State<BookingScreen> {
         specialRequests: _requestsController.text,
         idProofType: _idType,
         idProofBytes: _idProof!,
-        guestPhotoBytes: _guestPhoto,
+        idProofExtension: _idProofExtension,
+        guestPhotoBytes: _guestPhoto!,
       );
       if (!mounted) return;
       context.go(
         '/booking-success',
         extra: BookingSuccessData(
+          bookingId: result.bookingId,
           roomName: widget.room.roomName ?? 'Room',
           roomType: widget.room.roomType ?? 'Room',
           checkIn: _checkIn,
@@ -346,8 +395,7 @@ class _BookingScreenState extends State<BookingScreen> {
       debugPrint('Booking submit error: $error\n$stack');
       if (!mounted) return;
       final message = switch (error) {
-        BookingConflictException() =>
-          'This room is not available for the selected dates.',
+        BookingConflictException() => 'Aa dates have available nathi',
         BookingStageException(stage: BookingFailureStage.storage) =>
           'We could not upload your documents. Please retry your booking.',
         BookingStageException(stage: BookingFailureStage.database) =>
@@ -417,102 +465,235 @@ class _BookingScreenState extends State<BookingScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final contentWidth = width >= 600 ? 640.0 : width;
+          final desktop = width >= 900;
+          final contentWidth = desktop
+              ? 1200.0
+              : width >= 600
+              ? 640.0
+              : width;
           return Scaffold(
             backgroundColor: AppColors.cream,
             resizeToAvoidBottomInset: true,
-            body: Form(
-              key: _formKey,
-              autovalidateMode: _autoValidate
-                  ? AutovalidateMode.onUserInteraction
-                  : AutovalidateMode.disabled,
-              child: AppContainer(
-                padding: EdgeInsets.zero,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  slivers: [
-                    SliverToBoxAdapter(child: BookingHeader(onBack: _goBack)),
-                    SliverToBoxAdapter(
-                      child: _section(width, contentWidth, _guestInformation()),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(width, contentWidth, _guestPhotoCard()),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(width, contentWidth, _idProofCard()),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(width, contentWidth, _guestCountCard()),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(width, contentWidth, _datesCard()),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(
-                        width,
-                        contentWidth,
-                        _specialRequestsCard(),
+            body: desktop
+                ? Column(
+                    children: [
+                      BookingHeader(
+                        onBack: _goBack,
+                        imageUrl: widget.room.imageUrls.isEmpty
+                            ? null
+                            : widget.room.imageUrls.first,
                       ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(
-                        width,
-                        contentWidth,
-                        BookingRoomSummary(room: widget.room),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(
-                        width,
-                        contentWidth,
-                        BookingSummaryCard(
-                          room: widget.room,
-                          checkIn: _checkIn,
-                          checkOut: _checkOut,
-                          adults: _adults,
-                          children: _children,
+                      Expanded(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  flex: 6,
+                                  child: Form(
+                                    key: _formKey,
+                                    autovalidateMode: _autoValidate
+                                        ? AutovalidateMode.onUserInteraction
+                                        : AutovalidateMode.disabled,
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      keyboardDismissBehavior:
+                                          ScrollViewKeyboardDismissBehavior
+                                              .onDrag,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        18,
+                                        20,
+                                        18,
+                                        28,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          ..._formSections(760),
+                                          _bottomFormActions(),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 4,
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      20,
+                                      18,
+                                      28,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        ..._summarySections(460),
+                                        _desktopConfirmAction(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
+                    ],
+                  )
+                : Form(
+                    key: _formKey,
+                    autovalidateMode: _autoValidate
+                        ? AutovalidateMode.onUserInteraction
+                        : AutovalidateMode.disabled,
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: BookingHeader(
+                            onBack: _goBack,
+                            imageUrl: widget.room.imageUrls.isEmpty
+                                ? null
+                                : widget.room.imageUrls.first,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: contentWidth,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  18,
+                                  16,
+                                  28,
+                                ),
+                                child: Column(
+                                  children: [
+                                    ..._formSections(contentWidth),
+                                    ..._summarySections(contentWidth),
+                                    _bottomFormActions(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SliverToBoxAdapter(
-                      child: _section(
-                        width,
-                        contentWidth,
-                        _bottomFormActions(),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _section(
-                        width,
-                        contentWidth,
-                        const BookingTrustStrip(),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height:
-                            media.padding.bottom +
-                            (width < 390 ? 152 : 84) +
-                            16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            bottomNavigationBar: BookingStickyBar(
-              total: _total,
-              enabled: !_overCapacity && widget.room.status == 'available',
-              submitting: _submitting,
-              onConfirm: _confirm,
-            ),
+                  ),
+            bottomNavigationBar: desktop
+                ? null
+                : BookingStickyBar(
+                    total: _total,
+                    enabled:
+                        !_overCapacity && widget.room.status == 'available',
+                    submitting: _submitting,
+                    onConfirm: _confirm,
+                  ),
           );
         },
       ),
     );
   }
+
+  List<Widget> _formSections(double maxWidth) => [
+    _section(maxWidth, maxWidth, _guestInformation()),
+    _section(maxWidth, maxWidth, _guestPhotoCard()),
+    _section(maxWidth, maxWidth, _idProofCard()),
+    _section(maxWidth, maxWidth, _guestCountCard()),
+    _section(maxWidth, maxWidth, _datesCard()),
+    _section(maxWidth, maxWidth, _specialRequestsCard()),
+  ];
+
+  List<Widget> _summarySections(double maxWidth) => [
+    _section(maxWidth, maxWidth, BookingRoomSummary(room: widget.room)),
+    _section(
+      maxWidth,
+      maxWidth,
+      BookingSummaryCard(
+        room: widget.room,
+        checkIn: _checkIn,
+        checkOut: _checkOut,
+        adults: _adults,
+        children: _children,
+      ),
+    ),
+    _section(maxWidth, maxWidth, _cancellationNote()),
+    _section(
+      maxWidth,
+      maxWidth,
+      const Text(
+        'Your booking is safe & secure',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: AppColors.greyText, fontSize: 12),
+      ),
+    ),
+    _section(maxWidth, maxWidth, const BookingTrustStrip()),
+  ];
+
+  Widget _cancellationNote() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE9F5EA),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFB9D9BB)),
+    ),
+    child: const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.check_circle_outline, color: Color(0xFF25804B), size: 20),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Free Cancellation - cancel up to 24 hours before check-in',
+            style: TextStyle(
+              color: Color(0xFF236B3A),
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _desktopConfirmAction() => Column(
+    children: [
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed:
+              _submitting || _overCapacity || widget.room.status != 'available'
+              ? null
+              : _confirm,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.navy,
+            foregroundColor: AppColors.cream,
+            minimumSize: const Size(0, 52),
+            shape: const StadiumBorder(),
+          ),
+          icon: _submitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.cream,
+                  ),
+                )
+              : const Icon(Icons.lock_outline),
+          label: Text(_submitting ? 'Submitting…' : 'Confirm Booking'),
+        ),
+      ),
+    ],
+  );
 
   Widget _section(double width, double maxWidth, Widget child) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
@@ -539,9 +720,7 @@ class _BookingScreenState extends State<BookingScreen> {
           focusNode: _nameFocus,
           textInputAction: TextInputAction.next,
           prefixIcon: Icons.person_outline,
-          validator: (value) => (value?.trim().length ?? 0) < 2
-              ? 'Enter at least 2 characters.'
-              : null,
+          validator: BookingFormState.validateName,
           onSubmitted: (_) => _phoneFocus.requestFocus(),
         ),
         const SizedBox(height: 14),
@@ -579,10 +758,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(10),
                 ],
-                validator: (value) =>
-                    RegExp(r'^[6-9][0-9]{9}$').hasMatch(value?.trim() ?? '')
-                    ? null
-                    : 'Enter a valid 10-digit mobile number.',
+                validator: BookingFormState.validatePhone,
                 onSubmitted: (_) => _emailFocus.requestFocus(),
               ),
             ),
@@ -598,9 +774,7 @@ class _BookingScreenState extends State<BookingScreen> {
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           prefixIcon: Icons.email_outlined,
-          validator: (value) => _emailPattern.hasMatch(value?.trim() ?? '')
-              ? null
-              : 'Enter a valid email address.',
+          validator: BookingFormState.validateEmail,
         ),
       ],
     ),
@@ -684,85 +858,26 @@ class _BookingScreenState extends State<BookingScreen> {
   );
 
   Widget _guestPhotoCard() => BookingSectionCard(
-    title: 'Guest Photo (Optional)',
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    keyAnchor: _photoAnchor,
+    title: 'Guest Photo *',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Stack(
-          children: [
-            CircleAvatar(
-              radius: 34,
-              backgroundColor: AppColors.gold.withValues(alpha: .22),
-              backgroundImage: _guestPhoto == null
-                  ? null
-                  : MemoryImage(_guestPhoto!),
-              child: _guestPhoto == null
-                  ? const Icon(
-                      Icons.person_outline,
-                      color: AppColors.darkGold,
-                      size: 30,
-                    )
-                  : null,
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: CircleAvatar(
-                radius: 12,
-                backgroundColor: AppColors.darkGold,
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: AppColors.cream,
-                  size: 14,
-                ),
-              ),
-            ),
-          ],
+        GuestPhotoPicker(
+          bytes: _guestPhoto,
+          onTap: () => _chooseImage(forId: false),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: CustomPaint(
-            foregroundPainter: _DashedRoundedBorderPainter(AppColors.gold),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                onTap: () => _chooseImage(forId: false),
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.add_a_photo_outlined,
-                        color: AppColors.darkGold,
-                        size: 19,
-                      ),
-                      const SizedBox(width: 7),
-                      Flexible(
-                        child: Text(
-                          _guestPhoto == null
-                              ? 'Upload Photo (JPG, PNG)'
-                              : 'Change Photo',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.navy,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        if (_photoError != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            _photoError!,
+            style: const TextStyle(color: AppColors.navy, fontSize: 12),
           ),
+        ],
+        const SizedBox(height: 5),
+        const Text(
+          'JPG or PNG, up to 5 MB',
+          style: TextStyle(color: AppColors.greyText, fontSize: 11),
         ),
       ],
     ),
@@ -770,116 +885,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _idProofCard() => BookingSectionCard(
     keyAnchor: _idAnchor,
-    title: 'ID Proof',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          initialValue: _idType,
-          decoration: InputDecoration(
-            labelText: 'Proof Type',
-            labelStyle: const TextStyle(color: AppColors.navy),
-            filled: true,
-            fillColor: AppColors.cream,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-          ),
-          dropdownColor: AppColors.cream,
-          items: _idTypes
-              .map(
-                (type) => DropdownMenuItem(
-                  value: type,
-                  child: Text(
-                    type,
-                    style: const TextStyle(color: AppColors.navy),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) => setState(() => _idType = value ?? _idType),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            if (_idProof != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.memory(
-                  _idProof!,
-                  width: 54,
-                  height: 54,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(
-                Icons.check_circle_outline,
-                color: AppColors.darkGold,
-                size: 18,
-              ),
-              const SizedBox(width: 4),
-              const Expanded(
-                child: Text(
-                  'Uploaded',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.darkGold,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _chooseImage(forId: true),
-                child: const Text(
-                  'Change',
-                  style: TextStyle(color: AppColors.navy),
-                ),
-              ),
-            ] else
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _chooseImage(forId: true),
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text(
-                    'Upload ID Image',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navy,
-                    side: const BorderSide(color: AppColors.gold),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        if (_idError != null) ...[
-          const SizedBox(height: 5),
-          Text(
-            _idError!,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.navy, fontSize: 12),
-          ),
-        ],
-        const SizedBox(height: 8),
-        const Text(
-          'Your ID is stored securely and used only for check-in.',
-          style: TextStyle(
-            color: AppColors.greyText,
-            fontSize: 12,
-            height: 1.4,
-          ),
-        ),
-      ],
+    title: 'ID Proof (Aadhaar Card) *',
+    child: IdProofPicker(
+      type: _idType,
+      onTypeChanged: (value) => setState(() => _idType = value),
+      bytes: _idProof,
+      extension: _idProofExtension,
+      error: _idError,
+      onPick: () => _chooseImage(forId: true),
     ),
   );
 
@@ -892,7 +905,7 @@ class _BookingScreenState extends State<BookingScreen> {
           label: 'Adults',
           count: _adults,
           minimum: 1,
-          maximum: _capacity,
+          maximum: _capacity - _children,
           onChanged: (value) =>
               setState(() => _adults = value.clamp(1, _capacity).toInt()),
         ),
@@ -901,14 +914,14 @@ class _BookingScreenState extends State<BookingScreen> {
           label: 'Children',
           count: _children,
           minimum: 0,
-          maximum: null,
+          maximum: (_capacity - _adults).clamp(0, _capacity),
           onChanged: (value) =>
               setState(() => _children = value.clamp(0, 20).toInt()),
         ),
-        if (_overCapacity) ...[
+        if (_adults + _children >= _capacity) ...[
           const SizedBox(height: 8),
           Text(
-            'This room fits up to ${widget.room.capacity} guests',
+            'Max $_capacity guests',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -1076,35 +1089,4 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
     ],
   );
-}
-
-class _DashedRoundedBorderPainter extends CustomPainter {
-  const _DashedRoundedBorderPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(16)),
-      );
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final end = (distance + 6).clamp(0, metric.length).toDouble();
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance += 10;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRoundedBorderPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

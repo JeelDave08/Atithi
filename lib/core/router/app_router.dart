@@ -19,6 +19,8 @@ import '../../screens/splash_screen.dart';
 import '../../screens/rooms/rooms_screen.dart';
 import '../../screens/wishlist/wishlist_screen.dart';
 import '../../providers/stay_search_provider.dart';
+import '../../providers/pending_booking_provider.dart';
+import '../../screens/booking/booking_screen.dart';
 
 final authRepositoryProvider = Provider<AuthService>(
   (ref) => const AuthService(),
@@ -38,13 +40,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       if (location == '/splash') return null;
       final user = await auth.currentUserId();
-      const authLocations = {'/auth', '/register', '/forgot-password', '/login'};
+      const authLocations = {
+        '/auth',
+        '/register',
+        '/forgot-password',
+        '/login',
+      };
       if (user == null &&
           !authLocations.contains(location) &&
           location != '/wishlist') {
         return '/auth';
       }
       if (user != null && authLocations.contains(location)) {
+        if (ref.read(pendingBookingProvider) != null) return '/booking';
         return '/home';
       }
       return null;
@@ -59,10 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth',
         builder: (context, state) => AuthScreen(authRepository: auth),
       ),
-      GoRoute(
-        path: '/login',
-        redirect: (context, state) => '/auth',
-      ),
+      GoRoute(path: '/login', redirect: (context, state) => '/auth'),
       GoRoute(
         path: '/register',
         builder: (context, state) => RegisterScreen(authRepository: auth),
@@ -99,6 +104,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/bookings',
         builder: (context, state) => const PropertyBookingsScreen(),
+      ),
+      GoRoute(
+        path: '/booking',
+        builder: (context, state) {
+          final request =
+              state.extra as BookingRequest? ??
+              ref.read(pendingBookingProvider);
+          if (request == null) return const RoomsScreen();
+          Future.microtask(
+            () => ref.read(pendingBookingProvider.notifier).clear(),
+          );
+          return BookingFormScreen(
+            room: request.room,
+            checkIn: request.staySearch.checkIn,
+            checkOut: request.staySearch.checkOut,
+            adults: request.staySearch.adults,
+            children: request.staySearch.children,
+          );
+        },
       ),
       GoRoute(
         path: '/booking-success',

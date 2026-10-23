@@ -60,6 +60,13 @@ class BookingRoomSummary extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        if (room.roomNumber?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 3),
+          Text(
+            'Room ${room.roomNumber}',
+            style: const TextStyle(color: AppColors.greyText, fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

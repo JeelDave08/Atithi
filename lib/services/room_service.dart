@@ -39,14 +39,33 @@ class RoomService {
           .from('bookings')
           .select('id')
           .eq('room_id', roomId)
-          .eq('booking_status', 'confirmed')
+          .inFilter('booking_status', ['confirmed', 'pending'])
           .lt('check_in', _dateOnly(checkOut))
           .gt('check_out', _dateOnly(checkIn))
+          .or(
+            'booking_status.eq.confirmed,and(booking_status.eq.pending,expires_at.gt.${DateTime.now().toUtc().toIso8601String()})',
+          )
           .limit(1);
       return rows.isNotEmpty;
     } catch (error) {
-      if (kDebugMode) debugPrint('Room availability check failed: $error');
-      rethrow;
+      try {
+        final rows = await _client
+            .from('bookings')
+            .select('id')
+            .eq('room_id', roomId)
+            .eq('booking_status', 'confirmed')
+            .lt('check_in', _dateOnly(checkOut))
+            .gt('check_out', _dateOnly(checkIn))
+            .limit(1);
+        return rows.isNotEmpty;
+      } catch (fallbackError) {
+        if (kDebugMode) {
+          debugPrint(
+            'Room availability check failed: $error; fallback: $fallbackError',
+          );
+        }
+        rethrow;
+      }
     }
   }
 

@@ -38,12 +38,12 @@ class BookingSummaryCard extends StatelessWidget {
       child: Column(
         children: [
           _line('Room Type', room.roomType ?? 'Room'),
-          _line('Check-in', DateFormat('d MMM yyyy').format(checkIn)),
-          _line('Check-out', DateFormat('d MMM yyyy').format(checkOut)),
+          _line('Check-in', DateFormat('EEE, d MMM yyyy').format(checkIn)),
+          _line('Check-out', DateFormat('EEE, d MMM yyyy').format(checkOut)),
           _line('No. of Nights', '$nights'),
           _line(
             'Guests',
-            '$adults Adults + $children Child${children == 1 ? '' : 'ren'}',
+            '$adults Adult${adults == 1 ? '' : 's'} + $children Child${children == 1 ? '' : 'ren'}',
           ),
           const Divider(height: 22, color: AppColors.border),
           _line('Room Price ($nights Nights)', _currency.format(price)),
@@ -64,28 +64,6 @@ class BookingSummaryCard extends StatelessWidget {
                   'Total Amount',
                   _currency.format(price + taxes),
                   bold: true,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: AppColors.darkGold,
-                      size: 19,
-                    ),
-                    const SizedBox(width: 7),
-                    const Expanded(
-                      child: Text(
-                        'You can cancel this booking up to 24 hours before check-in.',
-                        style: TextStyle(
-                          color: AppColors.navy,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

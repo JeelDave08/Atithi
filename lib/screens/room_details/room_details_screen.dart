@@ -9,9 +9,10 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/room.dart';
+import '../../models/stay_search.dart';
+import '../../navigation/room_navigation.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
-import '../booking/booking_screen.dart';
 import 'room_details_constants.dart';
 import 'widgets/details_loading_skeleton.dart';
 import 'widgets/room_amenities_card.dart';
@@ -196,7 +197,16 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen> {
     final room = _room;
     if (room == null) return;
     if (FirebaseAuth.instance.currentUser == null) {
-      _showLoginMessage('Please log in before booking this room.');
+      openBooking(
+        context,
+        room,
+        staySearch: StaySearch(
+          checkIn: _checkIn,
+          checkOut: _checkOut,
+          adults: _adults,
+          children: _children,
+        ),
+      );
       return;
     }
     if (_isAvailable == false) {
@@ -205,15 +215,14 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen> {
       );
       return;
     }
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => BookingScreen(
-          room: room,
-          checkIn: _checkIn,
-          checkOut: _checkOut,
-          adults: _adults,
-          children: _children,
-        ),
+    openBooking(
+      context,
+      room,
+      staySearch: StaySearch(
+        checkIn: _checkIn,
+        checkOut: _checkOut,
+        adults: _adults,
+        children: _children,
       ),
     );
   }

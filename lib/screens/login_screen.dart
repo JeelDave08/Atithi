@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_repository.dart';
+import '../providers/pending_booking_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/app_text_field.dart';
@@ -21,6 +23,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isSubmitting = false;
   bool _googleSignInPending = false;
+
+  void _continueAfterLogin() {
+    final pending = ProviderScope.containerOf(context)
+        .read(pendingBookingProvider);
+    context.go(pending == null ? '/home' : '/booking');
+  }
 
   @override
   void dispose() {
@@ -45,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
         rememberMe: true,
       );
-      if (mounted) context.go('/home');
+      if (mounted) _continueAfterLogin();
     } on AuthFailure catch (failure) {
       if (mounted) showAuthMessage(context, authFailureMessage(failure));
     } catch (_) {
@@ -68,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       switch (result.status) {
         case GoogleSignInStatus.success:
-          context.go('/home');
+          _continueAfterLogin();
         case GoogleSignInStatus.cancelled:
           showAuthMessage(context, 'Google sign-in was cancelled.');
         case GoogleSignInStatus.error:
