@@ -38,25 +38,15 @@ class RoomFilterBar extends StatelessWidget {
     ),
     child: Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _category('All', Icons.grid_view),
-                    ...categories
-                        .where((c) => c != 'All')
-                        .map((c) => _category(c, Icons.bed_outlined)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            OutlinedButton.icon(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final chips = [
+              _category('All', Icons.grid_view),
+              ...categories
+                  .where((category) => category != 'All')
+                  .map((category) => _category(category, Icons.bed_outlined)),
+            ];
+            final filterButton = OutlinedButton.icon(
               onPressed: () => _sheet(context, 'Filters'),
               icon: const Icon(Icons.tune, size: 16),
               label: const Text('Filters', style: TextStyle(fontSize: 11)),
@@ -64,16 +54,36 @@ class RoomFilterBar extends StatelessWidget {
                 foregroundColor: AppColors.navy,
                 side: const BorderSide(color: AppColors.gold),
                 padding: const EdgeInsets.symmetric(horizontal: 9),
-                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(48, 48),
               ),
-            ),
-          ],
+            );
+            if (constraints.maxWidth >= 700) {
+              return Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [...chips, filterButton],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.all(4),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: chips),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                filterButton,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final pills = [
               _pill(
                 context,
                 'Price Range',
@@ -93,8 +103,15 @@ class RoomFilterBar extends StatelessWidget {
                 Icons.wifi,
                 amenities.isEmpty ? 'Any' : '${amenities.length} selected',
               ),
-            ],
-          ),
+            ];
+            if (constraints.maxWidth >= 900) {
+              return Wrap(spacing: 2, runSpacing: 6, children: pills);
+            }
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: pills),
+            );
+          },
         ),
       ],
     ),
@@ -145,7 +162,7 @@ class RoomFilterBar extends StatelessWidget {
         onTap: () => _sheet(context, title),
         customBorder: const StadiumBorder(),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 40),
+          constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             child: Row(

@@ -71,8 +71,8 @@ class _CircleButton extends StatelessWidget {
       customBorder: const CircleBorder(),
       onTap: onPressed,
       child: SizedBox(
-        width: 42,
-        height: 42,
+        width: 48,
+        height: 48,
         child: Icon(icon, color: AppColors.gold, size: 20),
       ),
     ),

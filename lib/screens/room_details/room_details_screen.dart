@@ -4,10 +4,12 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/room.dart';
+import '../../core/responsive/app_container.dart';
 import '../../services/room_service.dart';
 import '../../theme/app_colors.dart';
 import '../booking/booking_screen.dart';
@@ -356,6 +358,14 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _goBack() {
+    if (Navigator.of(context).canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -366,14 +376,18 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final wide = width > 700;
-          final contentWidth = wide ? 640.0 : width;
+          final wide = width >= 1024;
+          final mobile = width < 600;
+          final contentWidth = wide ? 1200.0 : width;
           final room = _room;
+          if (wide && room != null && !_notFound) {
+            return _desktopLayout(room, width);
+          }
           final slivers = <Widget>[
             SliverToBoxAdapter(
               child: RoomDetailsHeader(
                 isFavorite: _favorite,
-                onBack: () => Navigator.maybePop(context),
+                onBack: _goBack,
                 onFavorite: _toggleFavorite,
                 onShare: _shareRoom,
               ),
@@ -382,9 +396,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
 
           if (_notFound) {
             slivers.add(
-              SliverToBoxAdapter(
-                child: _RoomNotFound(onBack: () => Navigator.maybePop(context)),
-              ),
+              SliverToBoxAdapter(child: _RoomNotFound(onBack: _goBack)),
             );
           } else if (room == null) {
             if (_loading) {
@@ -397,7 +409,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                   child: _LoadError(
                     debugError: kDebugMode ? _debugError : null,
                     onRetry: _loadRoom,
-                    onBack: () => Navigator.maybePop(context),
+                    onBack: _goBack,
                   ),
                 ),
               );
@@ -415,46 +427,16 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                     contentWidth,
                   ),
                 ),
-              if (wide)
-                SliverToBoxAdapter(
-                  child: _section(
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 6,
-                          child: FadeTransition(
-                            opacity: _galleryFade,
-                            child: RepaintBoundary(
-                              child: RoomGallery(room: room),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 4,
-                          child: SlideTransition(
-                            position: _priceSlide,
-                            child: RoomPriceCard(pricePerNight: _pricePerNight),
-                          ),
-                        ),
-                      ],
-                    ),
-                    width,
-                    contentWidth,
+              SliverToBoxAdapter(
+                child: _section(
+                  FadeTransition(
+                    opacity: _galleryFade,
+                    child: RepaintBoundary(child: RoomGallery(room: room)),
                   ),
-                )
-              else
-                SliverToBoxAdapter(
-                  child: _section(
-                    FadeTransition(
-                      opacity: _galleryFade,
-                      child: RepaintBoundary(child: RoomGallery(room: room)),
-                    ),
-                    width,
-                    contentWidth,
-                  ),
+                  width,
+                  contentWidth,
                 ),
+              ),
               SliverToBoxAdapter(
                 child: _section(
                   RoomTitleBlock(room: room),
@@ -462,17 +444,16 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                   contentWidth,
                 ),
               ),
-              if (!wide)
-                SliverToBoxAdapter(
-                  child: _section(
-                    SlideTransition(
-                      position: _priceSlide,
-                      child: RoomPriceCard(pricePerNight: _pricePerNight),
-                    ),
-                    width,
-                    contentWidth,
+              SliverToBoxAdapter(
+                child: _section(
+                  SlideTransition(
+                    position: _priceSlide,
+                    child: RoomPriceCard(pricePerNight: _pricePerNight),
                   ),
+                  width,
+                  contentWidth,
                 ),
+              ),
               SliverToBoxAdapter(
                 child: _section(
                   RoomDescription(
@@ -514,7 +495,7 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                     errorMessage: _availabilityError,
                     maxGuests: room.capacity ?? 12,
                     onRetry: _refreshAvailability,
-                    compact: !wide,
+                    compact: mobile,
                     onCheckIn: _pickCheckIn,
                     onCheckOut: _pickCheckOut,
                     onAdultsChange: _changeAdults,
@@ -545,22 +526,49 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
                   contentWidth,
                 ),
               ),
+              if (!mobile)
+                SliverToBoxAdapter(
+                  child: _section(
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _canBook ? _book : null,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.navy,
+                          foregroundColor: AppColors.cream,
+                          disabledBackgroundColor: AppColors.greyText,
+                          minimumSize: const Size(0, 52),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text('Book This Room'),
+                      ),
+                    ),
+                    width,
+                    contentWidth,
+                  ),
+                ),
             ]);
           }
 
           slivers.add(
             SliverToBoxAdapter(
-              child: SizedBox(height: media.padding.bottom + 100 + 16),
+              child: SizedBox(
+                height: media.padding.bottom + (mobile ? 116 : 32),
+              ),
             ),
           );
 
           return Scaffold(
             backgroundColor: AppColors.cream,
             body: SafeArea(
+              top: false,
               bottom: false,
-              child: CustomScrollView(slivers: slivers),
+              child: AppContainer(
+                padding: EdgeInsets.zero,
+                child: CustomScrollView(slivers: slivers),
+              ),
             ),
-            bottomNavigationBar: room == null || _notFound
+            bottomNavigationBar: !mobile || room == null || _notFound
                 ? null
                 : StickyBookingBar(
                     total: _totalAmount,
@@ -572,6 +580,164 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
       ),
     );
   }
+
+  Widget _desktopLayout(Room room, double width) => Scaffold(
+    backgroundColor: AppColors.cream,
+    body: SafeArea(
+      top: false,
+      bottom: false,
+      child: Column(
+        children: [
+          RoomDetailsHeader(
+            isFavorite: _favorite,
+            onBack: _goBack,
+            onFavorite: _toggleFavorite,
+            onShare: _shareRoom,
+          ),
+          Expanded(
+            child: AppContainer(
+              padding: EdgeInsets.zero,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: CustomScrollView(
+                      slivers: [
+                        if (_loadError != null)
+                          SliverToBoxAdapter(
+                            child: _section(
+                              _RefreshError(
+                                onRetry: _loadRoom,
+                                debugError: kDebugMode ? _debugError : null,
+                              ),
+                              width,
+                              1200,
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: _section(
+                            FadeTransition(
+                              opacity: _galleryFade,
+                              child: RepaintBoundary(
+                                child: RoomGallery(room: room),
+                              ),
+                            ),
+                            width,
+                            1200,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: _section(
+                            RoomTitleBlock(room: room),
+                            width,
+                            1200,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: _section(
+                            RoomDescription(
+                              description: room.description ?? '',
+                              expanded: _descriptionExpanded,
+                              onToggle: () => setState(
+                                () => _descriptionExpanded =
+                                    !_descriptionExpanded,
+                              ),
+                            ),
+                            width,
+                            1200,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: _section(
+                            RoomAmenitiesCard(amenities: room.amenities),
+                            width,
+                            1200,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: _section(
+                            AboutRoomCard(description: room.description ?? ''),
+                            width,
+                            1200,
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: MediaQuery.paddingOf(context).bottom + 24,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 22),
+                  Expanded(
+                    flex: 4,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(0, 18, 0, 24),
+                      child: Column(
+                        children: [
+                          SlideTransition(
+                            position: _priceSlide,
+                            child: RoomPriceCard(pricePerNight: _pricePerNight),
+                          ),
+                          const SizedBox(height: 14),
+                          AvailabilityCard(
+                            checkIn: _checkIn,
+                            checkOut: _checkOut,
+                            nights: _nights,
+                            adults: _adults,
+                            children: _children,
+                            unitsLeft: room.unitsLeft,
+                            available: _statusAvailable,
+                            checking: _checkingAvailability,
+                            errorMessage: _availabilityError,
+                            maxGuests: room.capacity ?? 12,
+                            onRetry: _refreshAvailability,
+                            compact: false,
+                            onCheckIn: _pickCheckIn,
+                            onCheckOut: _pickCheckOut,
+                            onAdultsChange: _changeAdults,
+                            onChildrenChange: _changeChildren,
+                          ),
+                          const SizedBox(height: 14),
+                          RoomCapacitySummary(
+                            capacity: room.capacity,
+                            bedInfo: room.bedInfo,
+                            guestCount: _adults + _children,
+                          ),
+                          const SizedBox(height: 14),
+                          PriceBreakdownCard(
+                            pricePerNight: _pricePerNight,
+                            nights: _nights,
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _canBook ? _book : null,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.navy,
+                                foregroundColor: AppColors.cream,
+                                disabledBackgroundColor: AppColors.greyText,
+                                minimumSize: const Size(0, 52),
+                                shape: const StadiumBorder(),
+                              ),
+                              child: const Text('Book This Room'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _section(Widget child, double width, double contentWidth) => Padding(
     padding: const EdgeInsets.only(bottom: 18),

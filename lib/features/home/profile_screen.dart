@@ -3,13 +3,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../screens/login_screen.dart';
-import '../../shared/widgets/sunset_widgets.dart';
+import '../../core/navigation/app_shell.dart';
+import '../../core/responsive/app_container.dart';
+import '../../theme/app_colors.dart';
 
-const _profileNavy = Color(0xFF12284C);
-const _profileCream = Color(0xFFFAF3E4);
-const _profileGold = Color(0xFFD4A84F);
+const _profileNavy = AppColors.navy;
+const _profileCream = AppColors.cream;
+const _profileGold = AppColors.gold;
 const _profileRed = Color(0xFFD9534F);
 const _profileMuted = Color(0xFFB9B9B5);
 
@@ -56,10 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       await Supabase.instance.client.auth.signOut();
       if (!mounted) return false;
-      Navigator.of(context).pushAndRemoveUntil<void>(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+      context.go('/auth');
       return true;
     } catch (_) {
       if (!mounted) return false;
@@ -90,115 +89,118 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppShell(
+    activeRoute: '/profile',
     backgroundColor: _profileNavy,
-    body: Stack(
-      children: [
-        const _ProfileGlows(),
-        SafeArea(
-          bottom: false,
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: _profileGold),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    22,
-                    22,
-                    22,
-                    MediaQuery.paddingOf(context).bottom + 104,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Profile',
-                        style: GoogleFonts.playfairDisplay(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontStyle: FontStyle.italic,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _Entrance(
-                        animation: _entrance(0),
-                        child: ProfileHeader(
-                          name: _profile?.name ?? 'Not provided',
-                          bookings: '—',
-                          favorites: '—',
-                          memberSince: _profile?.memberSince ?? '—',
-                        ),
-                      ),
-                      const SizedBox(height: 27),
-                      Text(
-                        'PERSONAL DETAILS',
-                        style: GoogleFonts.dmSans(
-                          color: _profileGold,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 13),
-                      _Entrance(
-                        animation: _entrance(1),
-                        child: InfoTile(
-                          icon: Icons.person_outline_rounded,
-                          label: 'Name',
-                          value: _profile?.name ?? 'Not provided',
-                        ),
-                      ),
-                      const SizedBox(height: 11),
-                      _Entrance(
-                        animation: _entrance(2),
-                        child: InfoTile(
-                          icon: Icons.mail_outline_rounded,
-                          label: 'Email',
-                          value: _profile?.email ?? 'Not provided',
-                        ),
-                      ),
-                      const SizedBox(height: 11),
-                      _Entrance(
-                        animation: _entrance(3),
-                        child: InfoTile(
-                          icon: Icons.phone_outlined,
-                          label: 'Phone',
-                          value: _profile?.phone ?? 'Not provided',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: FilledButton.icon(
-                          onPressed: _showLogoutSheet,
-                          icon: const Icon(Icons.logout_rounded),
-                          label: Text(
-                            'Log out',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _profileCream,
-                            foregroundColor: _profileRed,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
-                            ),
+    wrapInContainer: false,
+    body: AppContainer(
+      maxWidthOverride: 720,
+      padding: EdgeInsets.zero,
+      backgroundColor: _profileNavy,
+      child: Stack(
+        children: [
+          const _ProfileGlows(),
+          SafeArea(
+            bottom: false,
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _profileGold),
+                  )
+                : SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      22,
+                      22,
+                      22,
+                      MediaQuery.paddingOf(context).bottom + 104,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Profile',
+                          style: GoogleFonts.playfairDisplay(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontStyle: FontStyle.italic,
+                            height: 1.1,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        _Entrance(
+                          animation: _entrance(0),
+                          child: ProfileHeader(
+                            name: _profile?.name ?? 'Not provided',
+                            bookings: '—',
+                            favorites: '—',
+                            memberSince: _profile?.memberSince ?? '—',
+                          ),
+                        ),
+                        const SizedBox(height: 27),
+                        Text(
+                          'PERSONAL DETAILS',
+                          style: GoogleFonts.dmSans(
+                            color: _profileGold,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        _Entrance(
+                          animation: _entrance(1),
+                          child: InfoTile(
+                            icon: Icons.person_outline_rounded,
+                            label: 'Name',
+                            value: _profile?.name ?? 'Not provided',
+                          ),
+                        ),
+                        const SizedBox(height: 11),
+                        _Entrance(
+                          animation: _entrance(2),
+                          child: InfoTile(
+                            icon: Icons.mail_outline_rounded,
+                            label: 'Email',
+                            value: _profile?.email ?? 'Not provided',
+                          ),
+                        ),
+                        const SizedBox(height: 11),
+                        _Entrance(
+                          animation: _entrance(3),
+                          child: InfoTile(
+                            icon: Icons.phone_outlined,
+                            label: 'Phone',
+                            value: _profile?.phone ?? 'Not provided',
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: FilledButton.icon(
+                            onPressed: _showLogoutSheet,
+                            icon: const Icon(Icons.logout_rounded),
+                            label: Text(
+                              'Log out',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _profileCream,
+                              foregroundColor: _profileRed,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-        ),
-        const Align(
-          alignment: Alignment.bottomCenter,
-          child: FloatingBottomNav(selected: 4),
-        ),
-      ],
+          ),
+        ],
+      ),
     ),
   );
 }

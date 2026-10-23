@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import 'core/navigation/app_shell.dart';
+import 'core/responsive/breakpoints.dart';
 import 'features/home/widgets/reveal_on_scroll.dart';
 import 'property_experience.dart';
 import 'theme/app_colors.dart';
@@ -25,7 +27,8 @@ class AtithiHomeScreen extends StatefulWidget {
 
 class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
   late DateTime _checkIn = _dateOnly(DateTime.now());
-  late DateTime _checkOut = _dateOnly(DateTime.now()).add(const Duration(days: 1));
+  late DateTime _checkOut = _dateOnly(DateTime.now())
+      .add(const Duration(days: 1));
   int _adults = 2;
   int _children = 0;
 
@@ -54,7 +57,9 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
     final firstCheckout = _checkIn.add(const Duration(days: 1));
     final selected = await showDatePicker(
       context: context,
-      initialDate: _checkOut.isBefore(firstCheckout) ? firstCheckout : _checkOut,
+      initialDate: _checkOut.isBefore(firstCheckout)
+          ? firstCheckout
+          : _checkOut,
       firstDate: firstCheckout,
       lastDate: _checkIn.add(const Duration(days: 730)),
       builder: _datePickerTheme,
@@ -105,141 +110,127 @@ class _AtithiHomeScreenState extends State<AtithiHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _cream,
+    return AppShell(
+      activeRoute: '/home',
       body: SafeArea(
         bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth > 560;
-            final content = CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _HomeHeader(
-                    onMenuSelected: (item) {
-                      switch (item) {
-                        case 'About Atithi':
-                          context.push('/about');
-                        case 'Contact Us':
-                          context.push('/contact');
-                        case 'Our Services':
-                          context.push('/services');
-                        case 'Log out':
-                          showLogoutDialog(context);
-                      }
-                    },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Builder(
+                builder: (context) => context.isMobile
+                    ? _HomeHeader(
+                        onMenuSelected: (item) {
+                          switch (item) {
+                            case 'About Atithi':
+                              context.push('/about');
+                            case 'Contact Us':
+                              context.push('/contact');
+                            case 'Our Services':
+                              context.push('/services');
+                            case 'Log out':
+                              showLogoutDialog(context);
+                          }
+                        },
+                      )
+                    : const SizedBox(height: 12),
+              ),
+            ),
+            SliverToBoxAdapter(child: HeroSection(onTap: _openRoomListing)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.zero,
+                child: Transform.translate(
+                  offset: const Offset(0, -26),
+                  child: BookingCard(
+                    checkIn: _checkIn,
+                    checkOut: _checkOut,
+                    adults: _adults,
+                    children: _children,
+                    onCheckInTap: _selectCheckIn,
+                    onCheckOutTap: _selectCheckOut,
+                    onAdultsChange: (value) =>
+                        _changeCount(adults: true, change: value),
+                    onChildrenChange: (value) =>
+                        _changeCount(adults: false, change: value),
+                    onSearch: _openRoomListing,
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: HeroSection(onTap: _openRoomListing),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 0),
+                child: _TrustStrip(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'Explore Atithi',
+                child: _QuickAccessRow(
+                  onTap: (title) {
+                    switch (title) {
+                      case 'Our Rooms':
+                        _openRoomListing();
+                      case 'Amenities':
+                        context.push('/services');
+                      case 'Services':
+                        context.push('/services');
+                      case 'About Us':
+                        context.push('/about');
+                      case 'Contact Us':
+                        context.push('/contact');
+                    }
+                  },
                 ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: Transform.translate(
-                      offset: const Offset(0, -26),
-                      child: BookingCard(
-                        checkIn: _checkIn,
-                        checkOut: _checkOut,
-                        adults: _adults,
-                        children: _children,
-                        onCheckInTap: _selectCheckIn,
-                        onCheckOutTap: _selectCheckOut,
-                        onAdultsChange: (value) =>
-                            _changeCount(adults: true, change: value),
-                        onChildrenChange: (value) =>
-                            _changeCount(adults: false, change: value),
-                        onSearch: _openRoomListing,
-                      ),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 0),
-                    child: _TrustStrip(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Explore Atithi',
-                    child: _QuickAccessRow(
-                      onTap: (title) {
-                        switch (title) {
-                          case 'Our Rooms':
-                            _openRoomListing();
-                          case 'Amenities':
-                            context.push('/services');
-                          case 'Services':
-                            context.push('/services');
-                          case 'About Us':
-                            context.push('/about');
-                          case 'Contact Us':
-                            context.push('/contact');
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Our Rooms',
-                    actionLabel: 'View All',
-                    onAction: _openRoomListing,
-                    child: const PropertyRoomsPreview(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Our Services',
-                    actionLabel: 'View All',
-                    onAction: () => context.push('/services'),
-                    child: const PropertyServicesPreview(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'About Atithi',
-                    actionLabel: 'Learn More',
-                    onAction: () => context.push('/about'),
-                    child: const PropertyAboutPreview(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Why Choose Atithi?',
-                    child: const PropertyHighlightsPreview(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Section(
-                    title: 'Contact Us',
-                    actionLabel: 'Get in Touch',
-                    onAction: () => context.push('/contact'),
-                    child: _ContactCard(onTap: () => context.push('/contact')),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: MediaQuery.paddingOf(context).bottom + 40,
-                  ),
-                ),
-              ],
-            );
-
-            if (isDesktop) {
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: content,
-                ),
-              );
-            }
-            return content;
-          },
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'Our Rooms',
+                actionLabel: 'View All',
+                onAction: _openRoomListing,
+                child: const PropertyRoomsPreview(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'Our Services',
+                actionLabel: 'View All',
+                onAction: () => context.push('/services'),
+                child: const PropertyServicesPreview(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'About Atithi',
+                actionLabel: 'Learn More',
+                onAction: () => context.push('/about'),
+                child: const PropertyAboutPreview(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'Why Choose Atithi?',
+                child: const PropertyHighlightsPreview(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Section(
+                title: 'Contact Us',
+                actionLabel: 'Get in Touch',
+                onAction: () => context.push('/contact'),
+                child: _ContactCard(onTap: () => context.push('/contact')),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.paddingOf(context).bottom + 100,
+              ),
+            ),
+          ],
         ),
       ),
-      bottomNavigationBar: const BottomNav(),
     );
   }
 }
@@ -250,7 +241,7 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(22, 10, 18, 4),
+    padding: const EdgeInsets.fromLTRB(6, 10, 2, 4),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -417,37 +408,57 @@ class HeroSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Background realistic heritage hotel archway photograph
-          AspectRatio(
-            aspectRatio: 575 / 427,
-            child: Image.asset(
-              'assets/images/heritage_hero_bg.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-          // Headline positioned gracefully in top-left cream area
-          Positioned(
-            top: 22,
-            left: 22,
-            child: Text(
-              'More than\njust a stay',
-              style: GoogleFonts.playfairDisplay(
-                color: _navy,
-                fontSize: 34,
-                height: 1.15,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -0.3,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ratio = context.responsive(
+          mobile: 4 / 3,
+          tablet: 16 / 9,
+          desktop: 21 / 9,
+        );
+        final heroHeight = math.min(480.0, constraints.maxWidth / ratio);
+        return GestureDetector(
+          onTap: onTap,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: SizedBox(
+              height: heroHeight,
+              width: constraints.maxWidth,
+              child: Stack(
+                fit: StackFit.expand,
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  ColoredBox(
+                    color: _cream,
+                    child: Image.asset(
+                      'assets/images/heritage_hero_bg.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    ),
+                  ),
+                  Positioned(
+                    top: context.isMobile ? 20 : 30,
+                    left: context.isMobile ? 18 : 36,
+                    child: Text(
+                      'More than\njust a stay',
+                      style: GoogleFonts.playfairDisplay(
+                        color: _navy,
+                        fontSize: context.responsive(
+                          mobile: 26,
+                          tablet: 32,
+                          desktop: 40,
+                        ),
+                        height: 1.15,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -478,124 +489,186 @@ class BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
-      decoration: BoxDecoration(
-        color: _cardCream,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1810284B),
-            blurRadius: 28,
-            spreadRadius: 0,
-            offset: Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Date Row
-          Row(
-            children: [
-              Expanded(
-                child: _DateField(
-                  label: 'Check-in',
-                  date: checkIn,
-                  onTap: onCheckInTap,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 820;
+        final dateRow = Row(
+          children: [
+            Expanded(
+              child: _DateField(
+                label: 'Check-in',
+                date: checkIn,
+                onTap: onCheckInTap,
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 38,
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              color: _gold.withValues(alpha: 0.35),
+            ),
+            Expanded(
+              child: _DateField(
+                label: 'Check-out',
+                date: checkOut,
+                onTap: onCheckOutTap,
+              ),
+            ),
+          ],
+        );
+        final guestsRow = Row(
+          children: [
+            Expanded(
+              child: _GuestCounter(
+                iconWidget: const Icon(
+                  Icons.person_outline_rounded,
+                  color: _navy,
+                  size: 26,
                 ),
+                label: 'Adults',
+                count: adults,
+                onDecrement: () => onAdultsChange(-1),
+                onIncrement: () => onAdultsChange(1),
               ),
-              Container(
-                width: 1,
-                height: 38,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                color: _gold.withValues(alpha: 0.35),
+            ),
+            Container(
+              width: 1,
+              height: 38,
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              color: _gold.withValues(alpha: 0.35),
+            ),
+            Expanded(
+              child: _GuestCounter(
+                iconWidget: const _ChildFaceIcon(size: 26, color: _navy),
+                label: 'Children',
+                count: children,
+                onDecrement: () => onChildrenChange(-1),
+                onIncrement: () => onChildrenChange(1),
               ),
-              Expanded(
-                child: _DateField(
-                  label: 'Check-out',
-                  date: checkOut,
-                  onTap: onCheckOutTap,
-                ),
-              ),
-            ],
-          ),
-          // Subtle Gold Separator
-          Container(
-            height: 1,
-            margin: const EdgeInsets.symmetric(vertical: 16),
-            color: _gold.withValues(alpha: 0.35),
-          ),
-          // Guests Row
-          Row(
-            children: [
-              Expanded(
-                child: _GuestCounter(
-                  iconWidget: const Icon(
-                    Icons.person_outline_rounded,
-                    color: _navy,
-                    size: 26,
-                  ),
-                  label: 'Adults',
-                  count: adults,
-                  onDecrement: () => onAdultsChange(-1),
-                  onIncrement: () => onAdultsChange(1),
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 38,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                color: _gold.withValues(alpha: 0.35),
-              ),
-              Expanded(
-                child: _GuestCounter(
-                  iconWidget: const _ChildFaceIcon(size: 26, color: _navy),
-                  label: 'Children',
-                  count: children,
-                  onDecrement: () => onChildrenChange(-1),
-                  onIncrement: () => onChildrenChange(1),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Large Navy "Find a stay  →" Button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: Material(
-              color: _navy,
+            ),
+          ],
+        );
+        final searchButton = SizedBox(
+          width: compact ? double.infinity : 160,
+          height: 56,
+          child: Material(
+            color: _navy,
+            borderRadius: BorderRadius.circular(28),
+            child: InkWell(
               borderRadius: BorderRadius.circular(28),
-              elevation: 0,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(28),
-                onTap: onSearch,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Find a stay',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_forward_rounded,
+              onTap: onSearch,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Find a stay',
+                    style: TextStyle(
                       color: Colors.white,
-                      size: 20,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: compact ? double.infinity : 1000,
+            ),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+              decoration: BoxDecoration(
+                color: _cardCream,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1810284B),
+                    blurRadius: 28,
+                    spreadRadius: 0,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: compact
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        dateRow,
+                        Container(
+                          height: 1,
+                          margin: const EdgeInsets.symmetric(vertical: 16),
+                          color: _gold.withValues(alpha: 0.35),
+                        ),
+                        guestsRow,
+                        const SizedBox(height: 20),
+                        searchButton,
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _DateField(
+                            label: 'Check-in',
+                            date: checkIn,
+                            onTap: onCheckInTap,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: _DateField(
+                            label: 'Check-out',
+                            date: checkOut,
+                            onTap: onCheckOutTap,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 3,
+                          child: _GuestCounter(
+                            iconWidget: const Icon(
+                              Icons.person_outline_rounded,
+                              color: _navy,
+                              size: 24,
+                            ),
+                            label: 'Adults',
+                            count: adults,
+                            onDecrement: () => onAdultsChange(-1),
+                            onIncrement: () => onAdultsChange(1),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 3,
+                          child: _GuestCounter(
+                            iconWidget: const _ChildFaceIcon(
+                              size: 24,
+                              color: _navy,
+                            ),
+                            label: 'Children',
+                            count: children,
+                            onDecrement: () => onChildrenChange(-1),
+                            onIncrement: () => onChildrenChange(1),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        searchButton,
+                      ],
+                    ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -620,11 +693,7 @@ class _DateField extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.calendar_today_outlined,
-            color: _navy,
-            size: 23,
-          ),
+          const Icon(Icons.calendar_today_outlined, color: _navy, size: 23),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -677,64 +746,82 @@ class _GuestCounter extends StatelessWidget {
   final VoidCallback onIncrement;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        iconWidget,
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _secondaryText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final counter = Row(
+        children: [
+          Text(
+            '$count',
+            style: const TextStyle(
+              color: _navy,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          _CircleRoundButton(icon: Icons.remove, onTap: onDecrement),
+          const SizedBox(width: 4),
+          _CircleRoundButton(icon: Icons.add, onTap: onIncrement),
+        ],
+      );
+      final labelRow = Row(
+        children: [
+          iconWidget,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(height: 3),
-              Row(
+            ),
+          ),
+        ],
+      );
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        child: constraints.maxWidth < 150
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [labelRow, counter],
+              )
+            : Row(
                 children: [
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      color: _navy,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  iconWidget,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _secondaryText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        counter,
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  _CircleRoundButton(
-                    icon: Icons.remove,
-                    onTap: onDecrement,
-                  ),
-                  const SizedBox(width: 6),
-                  _CircleRoundButton(
-                    icon: Icons.add,
-                    onTap: onIncrement,
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ],
-    ),
+      );
+    },
   );
 }
 
 class _CircleRoundButton extends StatelessWidget {
-  const _CircleRoundButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _CircleRoundButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -747,15 +834,9 @@ class _CircleRoundButton extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       child: SizedBox(
-        width: 30,
-        height: 30,
-        child: Center(
-          child: Icon(
-            icon,
-            size: 16,
-            color: _navy,
-          ),
-        ),
+        width: 44,
+        height: 44,
+        child: Center(child: Icon(icon, size: 16, color: _navy)),
       ),
     ),
   );
@@ -797,7 +878,10 @@ class _ChildFacePainter extends CustomPainter {
 
     // Left ear
     canvas.drawArc(
-      Rect.fromCircle(center: Offset(center.dx - radius, center.dy), radius: 2.8),
+      Rect.fromCircle(
+        center: Offset(center.dx - radius, center.dy),
+        radius: 2.8,
+      ),
       -math.pi / 2,
       math.pi,
       false,
@@ -805,7 +889,10 @@ class _ChildFacePainter extends CustomPainter {
     );
     // Right ear
     canvas.drawArc(
-      Rect.fromCircle(center: Offset(center.dx + radius, center.dy), radius: 2.8),
+      Rect.fromCircle(
+        center: Offset(center.dx + radius, center.dy),
+        radius: 2.8,
+      ),
       -math.pi / 2,
       math.pi,
       false,
@@ -847,7 +934,7 @@ class _TrustStrip extends StatelessWidget {
   const _TrustStrip();
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+    padding: EdgeInsets.zero,
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
@@ -934,7 +1021,7 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+    padding: const EdgeInsets.fromLTRB(0, 26, 0, 0),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -947,7 +1034,11 @@ class _Section extends StatelessWidget {
                   title,
                   style: GoogleFonts.playfairDisplay(
                     color: _navy,
-                    fontSize: 22,
+                    fontSize: context.responsive(
+                      mobile: 26,
+                      tablet: 32,
+                      desktop: 40,
+                    ),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1014,57 +1105,70 @@ class _QuickAccessRowState extends State<_QuickAccessRow> {
       _IconLabel(Icons.info_outline_rounded, 'About Us'),
       _IconLabel(Icons.phone_in_talk_outlined, 'Contact Us'),
     ];
-    return SizedBox(
-      height: 98,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 16),
-        itemBuilder: (context, index) => SizedBox(
-          width: 67,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () {
-              setState(() => _selected = index);
-              widget.onTap(items[index].label);
-            },
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutBack,
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _selected == index ? _navy : _cardCream,
-                    border: Border.all(color: _gold, width: 1.2),
-                  ),
-                  child: Transform.rotate(
-                    angle: _selected == index ? -.14 : 0,
-                    child: Icon(
-                      items[index].icon,
-                      color: _selected == index ? _gold : _navy,
-                      size: 24,
-                    ),
-                  ),
+    Widget item(int index) => SizedBox(
+      width: context.isMobile ? 67 : 104,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          setState(() => _selected = index);
+          widget.onTap(items[index].label);
+        },
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutBack,
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _selected == index ? _navy : _cardCream,
+                border: Border.all(color: _gold, width: 1.2),
+              ),
+              child: Transform.rotate(
+                angle: _selected == index ? -.14 : 0,
+                child: Icon(
+                  items[index].icon,
+                  color: _selected == index ? _gold : _navy,
+                  size: 24,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  items[index].label,
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: _navy,
-                    fontSize: 10,
-                    height: 1.1,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(height: 6),
+            Text(
+              items[index].label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _navy,
+                fontSize: context.isMobile ? 10 : 12,
+                height: 1.1,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+    if (context.isMobile) {
+      return SizedBox(
+        height: 98,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 16),
+          itemBuilder: (context, index) => item(index),
+        ),
+      );
+    }
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 24,
+        runSpacing: 12,
+        children: [
+          for (var index = 0; index < items.length; index++) item(index),
+        ],
       ),
     );
   }
@@ -1119,11 +1223,7 @@ class _ContactCard extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(
-                  Icons.phone_in_talk_rounded,
-                  color: _gold,
-                  size: 24,
-                ),
+                Icon(Icons.phone_in_talk_rounded, color: _gold, size: 24),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1229,11 +1329,7 @@ class _NavItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: _navy,
-            size: 25,
-          ),
+          Icon(icon, color: _navy, size: 25),
           const SizedBox(height: 4),
           Text(
             label,

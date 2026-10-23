@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../models/room.dart';
+import '../../core/navigation/app_shell.dart';
+import '../../core/responsive/breakpoints.dart';
 import '../../services/room_service.dart';
 import '../../providers/rooms_provider.dart';
 import '../../navigation/room_navigation.dart';
@@ -272,10 +274,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop) context.go('/home');
         },
-        child: Scaffold(
-          backgroundColor: AppColors.cream,
-          resizeToAvoidBottomInset: true,
+        child: AppShell(
+          activeRoute: '/rooms',
           body: SafeArea(
+            top: false,
             bottom: false,
             child: RefreshIndicator(
               color: AppColors.darkGold,
@@ -283,11 +285,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final maxWidth = constraints.maxWidth;
-                  final columns = maxWidth < 600
+                  final screenWidth = context.screenWidth;
+                  final columns = screenWidth < 600
                       ? 1
-                      : maxWidth < 900
+                      : screenWidth < 1024
                       ? 2
-                      : 3;
+                      : screenWidth < 1440
+                      ? 3
+                      : 4;
                   final contentWidth = maxWidth > 1200 ? 1160.0 : maxWidth;
 
                   return CustomScrollView(
@@ -306,12 +311,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       ),
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            maxWidth > 700 ? 24 : 16,
-                            8,
-                            maxWidth > 700 ? 24 : 16,
-                            0,
-                          ),
+                          padding: const EdgeInsets.only(top: 8),
                           child: RoomSearchBar(
                             controller: _searchController,
                             onChanged: _onSearchChanged,
@@ -416,7 +416,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               ),
             ),
           ),
-          bottomNavigationBar: const _RoomsNavigation(),
         ),
       ),
     );
@@ -730,93 +729,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
     );
   }
-}
-
-class _RoomsNavigation extends StatelessWidget {
-  const _RoomsNavigation();
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: AppColors.cream,
-      boxShadow: [
-        BoxShadow(
-          color: Color(0x160F2943),
-          blurRadius: 12,
-          offset: Offset(0, -3),
-        ),
-      ],
-    ),
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            _item(
-              context,
-              Icons.home_outlined,
-              'Home',
-              () => context.go('/home'),
-            ),
-            _item(context, Icons.bed_outlined, 'Rooms', null, true),
-            _item(
-              context,
-              Icons.event_note_outlined,
-              'Bookings',
-              () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const Scaffold(
-                    body: Center(
-                      child: Text('Booking history will appear here.'),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _item(
-              context,
-              Icons.person_outline_rounded,
-              'Profile',
-              () => context.go('/profile'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  Widget _item(
-    BuildContext context,
-    IconData icon,
-    String label,
-    VoidCallback? onTap, [
-    bool selected = false,
-  ]) => Expanded(
-    child: InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: selected ? AppColors.darkGold : AppColors.greyText,
-            size: 21,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? AppColors.navy : AppColors.greyText,
-              fontSize: 10,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _SortLabel extends StatelessWidget {
