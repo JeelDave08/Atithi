@@ -33,6 +33,7 @@ class RoomsScreen extends ConsumerStatefulWidget {
     this.checkOut,
     this.adults = 2,
     this.children = 0,
+    this.clearStaySearch = false,
     super.key,
   });
 
@@ -40,6 +41,12 @@ class RoomsScreen extends ConsumerStatefulWidget {
   final DateTime? checkOut;
   final int adults;
   final int children;
+  /// When true, clears [staySearchProvider] after the first frame.
+  /// Use this when navigating to /rooms without a [RoomSearchSelection]
+  /// so the clear happens outside the GoRouter builder (which runs
+  /// during the widget-tree build and would otherwise trigger Riverpod's
+  /// "Tried to modify a provider while the widget tree was building" error).
+  final bool clearStaySearch;
 
   @override
   ConsumerState<RoomsScreen> createState() => _RoomsScreenState();
@@ -66,6 +73,13 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     if (kDebugMode && !_didDebugRowCheck) {
       _didDebugRowCheck = true;
       unawaited(_debugRoomRowCount());
+    }
+    if (widget.clearStaySearch) {
+      // Must not call ref inside initState/build – defer to after first frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(staySearchProvider.notifier).clear();
+      });
     }
     _load();
   }
