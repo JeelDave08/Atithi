@@ -4,17 +4,11 @@ import '../../../core/image_utils.dart';
 import '../../../models/room.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_network_image.dart';
+import '../../../widgets/wishlist_button.dart';
 
 class RoomImageCarousel extends StatefulWidget {
-  const RoomImageCarousel({
-    required this.room,
-    required this.isFavorite,
-    required this.onFavorite,
-    super.key,
-  });
+  const RoomImageCarousel({required this.room, super.key});
   final Room room;
-  final bool isFavorite;
-  final VoidCallback onFavorite;
   @override
   State<RoomImageCarousel> createState() => _RoomImageCarouselState();
 }
@@ -80,19 +74,9 @@ class _RoomImageCarouselState extends State<RoomImageCarousel> {
               ),
             ),
           Positioned(
-            top: 8,
-            right: 8,
-            child: IconButton(
-              onPressed: widget.onFavorite,
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: .92),
-              ),
-              icon: Icon(
-                widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: widget.isFavorite ? Colors.red : AppColors.navy,
-                size: 19,
-              ),
-            ),
+            top: 6,
+            right: 6,
+            child: WishlistButton(roomId: widget.room.id),
           ),
           if (urls.length > 1)
             Positioned(

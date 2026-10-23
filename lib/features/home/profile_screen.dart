@@ -1,6 +1,8 @@
 import 'dart:ui' as ui;
 
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/navigation/app_shell.dart';
 import '../../core/responsive/app_container.dart';
 import '../../theme/app_colors.dart';
+import '../../providers/wishlist_provider.dart';
+
+import 'package:intl/intl.dart';
 
 const _profileNavy = AppColors.navy;
 const _profileCream = AppColors.cream;
@@ -15,18 +20,19 @@ const _profileGold = AppColors.gold;
 const _profileRed = Color(0xFFD9534F);
 const _profileMuted = Color(0xFFB9B9B5);
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entranceController;
   _ProfileData? _profile;
   bool _loading = true;
+  int? _bookingsCount;
 
   @override
   void initState() {
@@ -36,17 +42,36 @@ class _ProfileScreenState extends State<ProfileScreen>
       duration: const Duration(milliseconds: 1600),
     );
     _loadProfile();
+    _loadBookingsCount();
   }
 
   Future<void> _loadProfile() async {
     await Future<void>.delayed(Duration.zero);
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = firebase.FirebaseAuth.instance.currentUser;
     if (!mounted) return;
     setState(() {
-      _profile = _ProfileData.fromUser(user);
+      _profile = _ProfileData.fromFirebaseUser(user);
       _loading = false;
     });
     _entranceController.forward();
+  }
+
+  Future<void> _loadBookingsCount() async {
+    final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _bookingsCount = 0);
+      return;
+    }
+    try {
+      final rows = await Supabase.instance.client
+          .from('bookings')
+          .select('id')
+          .eq('user_id', uid);
+      if (mounted) setState(() => _bookingsCount = rows.length);
+    } catch (error) {
+      debugPrint('Profile booking count failed: $error');
+      if (mounted) setState(() => _bookingsCount = 0);
+    }
   }
 
   Animation<double> _entrance(int step) => CurvedAnimation(
@@ -56,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<bool> _signOut(BuildContext sheetContext) async {
     try {
-      await Supabase.instance.client.auth.signOut();
+      await firebase.FirebaseAuth.instance.signOut();
       if (!mounted) return false;
       context.go('/auth');
       return true;
@@ -130,8 +155,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                           animation: _entrance(0),
                           child: ProfileHeader(
                             name: _profile?.name ?? 'Not provided',
-                            bookings: '—',
-                            favorites: '—',
+                            bookings: _bookingsCount?.toString() ?? '…',
+                            favorites: ref.watch(wishlistProvider).loading
+                                ? '…'
+                                : ref.watch(wishlistProvider).count.toString(),
+                            onFavoritesTap: () => context.push('/wishlist'),
                             memberSince: _profile?.memberSince ?? '—',
                           ),
                         ),
@@ -173,6 +201,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                         const SizedBox(height: 20),
+                        _WishlistMenuTile(
+                          count: ref.watch(wishlistProvider).count,
+                          onTap: () => context.push('/wishlist'),
+                        ),
+                        const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -211,6 +244,7 @@ class ProfileHeader extends StatelessWidget {
     required this.bookings,
     required this.favorites,
     required this.memberSince,
+    this.onFavoritesTap,
     super.key,
   });
 
@@ -218,6 +252,7 @@ class ProfileHeader extends StatelessWidget {
   final String bookings;
   final String favorites;
   final String memberSince;
+  final VoidCallback? onFavoritesTap;
 
   String get _initials {
     final parts = name
@@ -295,7 +330,11 @@ class ProfileHeader extends StatelessWidget {
                     ),
                     _statDivider,
                     Expanded(
-                      child: StatItem(label: 'Favorites', value: favorites),
+                      child: StatItem(
+                        label: 'Favorites',
+                        value: favorites,
+                        onTap: onFavoritesTap,
+                      ),
                     ),
                     _statDivider,
                     Expanded(
@@ -361,36 +400,49 @@ class _Avatar extends StatelessWidget {
 }
 
 class StatItem extends StatelessWidget {
-  const StatItem({required this.label, required this.value, super.key});
+  const StatItem({
+    required this.label,
+    required this.value,
+    this.onTap,
+    super.key,
+  });
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Text(
-        value,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.playfairDisplay(
-          color: _profileNavy,
-          fontSize: 17,
-          fontWeight: FontWeight.w700,
-        ),
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.playfairDisplay(
+              color: _profileNavy,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(
+              color: _profileNavy.withValues(alpha: .68),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
-      const SizedBox(height: 3),
-      Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.dmSans(
-          color: _profileNavy.withValues(alpha: .68),
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ],
+    ),
   );
 }
 
@@ -638,17 +690,17 @@ class _ProfileData {
   final String? phone;
   final String? memberSince;
 
-  factory _ProfileData.fromUser(User? user) {
-    final metadata = user?.userMetadata ?? const <String, dynamic>{};
-    final name =
-        _nonEmpty(metadata['full_name']) ?? _nonEmpty(metadata['name']);
-    final phone = _nonEmpty(user?.phone) ?? _nonEmpty(metadata['phone']);
-    final createdAt = DateTime.tryParse(user?.createdAt ?? '');
+  factory _ProfileData.fromFirebaseUser(firebase.User? user) {
+    final name = _nonEmpty(user?.displayName);
+    final phone = _nonEmpty(user?.phoneNumber);
+    final createdAt = user?.metadata.creationTime;
     return _ProfileData(
       name: name,
       email: _nonEmpty(user?.email),
       phone: phone,
-      memberSince: createdAt?.year.toString(),
+      memberSince: createdAt == null
+          ? null
+          : DateFormat('MMM yyyy').format(createdAt),
     );
   }
 
@@ -656,4 +708,71 @@ class _ProfileData {
     final text = value?.toString().trim();
     return text == null || text.isEmpty ? null : text;
   }
+}
+
+class _WishlistMenuTile extends StatelessWidget {
+  const _WishlistMenuTile({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white.withValues(alpha: .07),
+    borderRadius: BorderRadius.circular(20),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 78),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _profileGold.withValues(alpha: .28)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: _profileGold.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.favorite_border_rounded,
+                color: _profileGold,
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Text(
+                'My Wishlist',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _profileGold,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: _profileNavy,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: _profileGold),
+          ],
+        ),
+      ),
+    ),
+  );
 }

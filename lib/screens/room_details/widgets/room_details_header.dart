@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/wishlist_button.dart';
 
 class RoomDetailsHeader extends StatelessWidget {
   const RoomDetailsHeader({
-    required this.isFavorite,
+    required this.roomId,
     required this.onBack,
-    required this.onFavorite,
     required this.onShare,
     super.key,
   });
 
-  final bool isFavorite;
+  final String roomId;
   final VoidCallback onBack;
-  final VoidCallback onFavorite;
   final VoidCallback onShare;
 
   @override
@@ -43,10 +42,7 @@ class RoomDetailsHeader extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              _CircleButton(
-                icon: isFavorite ? Icons.favorite : Icons.favorite_border,
-                onPressed: onFavorite,
-              ),
+              WishlistButton(roomId: roomId, size: 40, onDarkBackground: true),
               const SizedBox(width: 8),
               _CircleButton(icon: Icons.share_outlined, onPressed: onShare),
             ],

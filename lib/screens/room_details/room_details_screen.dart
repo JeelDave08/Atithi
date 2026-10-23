@@ -62,7 +62,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
   late int _adults;
   late int _children;
   bool _loading = true;
-  bool _favorite = false;
   bool _descriptionExpanded = false;
   bool _checkingAvailability = true;
   bool? _isAvailable;
@@ -126,7 +125,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
     _entranceController.forward();
 
     _loadRoom();
-    _loadFavorite();
     _refreshAvailability();
   }
 
@@ -161,40 +159,6 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
         if (kDebugMode) _debugError = '$error';
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _loadFavorite() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    try {
-      final ids = await _service.fetchFavoriteIds(user.uid);
-      if (mounted) setState(() => _favorite = ids.contains(widget.roomId));
-    } catch (error) {
-      if (kDebugMode) debugPrint('Room favorite check failed: $error');
-    }
-  }
-
-  Future<void> _toggleFavorite() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showLoginMessage('Please log in to save your favorite rooms.');
-      return;
-    }
-
-    final wasFavorite = _favorite;
-    setState(() => _favorite = !wasFavorite);
-    try {
-      await _service.toggleFavorite(
-        user.uid,
-        widget.roomId,
-        isFavorite: wasFavorite,
-      );
-    } catch (error) {
-      if (kDebugMode) debugPrint('Room favorite update failed: $error');
-      if (!mounted) return;
-      setState(() => _favorite = wasFavorite);
-      _showLoginMessage('Could not update favorite. Please try again.');
     }
   }
 
@@ -386,9 +350,8 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
           final slivers = <Widget>[
             SliverToBoxAdapter(
               child: RoomDetailsHeader(
-                isFavorite: _favorite,
+                roomId: widget.roomId,
                 onBack: _goBack,
-                onFavorite: _toggleFavorite,
                 onShare: _shareRoom,
               ),
             ),
@@ -589,9 +552,8 @@ class _RoomDetailsScreenState extends State<RoomDetailsScreen>
       child: Column(
         children: [
           RoomDetailsHeader(
-            isFavorite: _favorite,
+            roomId: widget.roomId,
             onBack: _goBack,
-            onFavorite: _toggleFavorite,
             onShare: _shareRoom,
           ),
           Expanded(

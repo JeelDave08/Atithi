@@ -21,6 +21,7 @@ import 'navigation/room_navigation.dart';
 import 'core/navigation/app_shell.dart';
 import 'core/responsive/app_container.dart';
 import 'core/responsive/breakpoints.dart';
+import 'widgets/wishlist_button.dart';
 
 const _experienceCream = AppColors.cream;
 const _experienceCard = AppColors.surface;
@@ -2606,17 +2607,26 @@ class _RoomCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => openRoomDetails(context, room),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final imageHeight = constraints.maxWidth * 10 / 16;
-              return _RoomImageCarousel(
-                imageUrls: room.imageUrls,
-                height: imageHeight,
-              );
-            },
-          ),
+        Stack(
+          children: [
+            InkWell(
+              onTap: () => openRoomDetails(context, room),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final imageHeight = constraints.maxWidth * 10 / 16;
+                  return _RoomImageCarousel(
+                    imageUrls: room.imageUrls,
+                    height: imageHeight,
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: WishlistButton(roomId: room.id),
+            ),
+          ],
         ),
         _roomDetails(context),
       ],

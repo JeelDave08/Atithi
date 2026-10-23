@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,9 +16,11 @@ import '../../theme/app_colors.dart';
 import '../../features/home/widgets/reveal_on_scroll.dart';
 import 'widgets/room_card.dart';
 import 'widgets/room_filter_bar.dart';
+import 'widgets/room_filters_sheet.dart';
 import 'widgets/room_search_bar.dart';
 import 'widgets/rooms_header.dart';
 import 'widgets/why_choose_atithi_card.dart';
+import 'models/room_filters.dart';
 
 class RoomsScreen extends ConsumerStatefulWidget {
   const RoomsScreen({
@@ -48,16 +49,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   Timer? _searchDebounce;
   String searchQuery = '';
   List<Room> _rooms = [];
-  List<String> _categories = [];
-  Set<String> _favorites = {};
-  final Set<String> _amenities = {};
   bool _loading = true;
   Object? _error;
   String? _debugError;
-  String _category = 'All';
-  String _sort = 'Recommended';
-  String? _price;
-  String? _capacity;
+  RoomFilters _filters = const RoomFilters();
 
   @override
   void initState() {
@@ -91,60 +86,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     setState(() => searchQuery = '');
   }
 
-  List<Room> applyFilters(List<Room> rooms) {
-    final rawQuery = searchQuery.toLowerCase().trim();
-    final words = rawQuery
-        .split(RegExp(r'\s+'))
-        .map((word) => word.replaceAll(RegExp(r'[-\s]'), ''))
-        .where((word) => word.isNotEmpty)
-        .toList();
-    final filtered = rooms.where((room) {
-      if (_category != 'All' && room.roomType != _category) return false;
-      final price = room.pricePerNight ?? 0;
-      if (_price == 'Under 4000' && price >= 4000) return false;
-      if (_price == '4000-6000' && (price < 4000 || price > 6000)) return false;
-      if (_price == '6000+' && price <= 6000) return false;
-      final capacity = room.capacity ?? 0;
-      if (_capacity == '1-2' && (capacity < 1 || capacity > 2)) return false;
-      if (_capacity == '3-4' && (capacity < 3 || capacity > 4)) return false;
-      if (_capacity == '5+' && capacity < 5) return false;
-      if (_amenities.isNotEmpty &&
-          !_amenities.every((amenity) => room.amenities.contains(amenity))) {
-        return false;
-      }
-      if (rawQuery.isEmpty) return true;
-      final searchable =
-          [
-                room.roomNumber,
-                room.roomName,
-                room.roomType,
-                room.description,
-                ...room.amenities,
-                room.bedInfo,
-                if (room.capacity != null) '${room.capacity} guests',
-                if (room.pricePerNight != null)
-                  room.pricePerNight!.toStringAsFixed(0),
-              ]
-              .whereType<String>()
-              .join(' ')
-              .toLowerCase()
-              .replaceAll(RegExp(r'[-\s]'), '');
-      return words.every(searchable.contains);
-    }).toList();
-    switch (_sort) {
-      case 'Price Low to High':
-        filtered.sort(
-          (a, b) => (a.pricePerNight ?? 0).compareTo(b.pricePerNight ?? 0),
-        );
-      case 'Price High to Low':
-        filtered.sort(
-          (a, b) => (b.pricePerNight ?? 0).compareTo(a.pricePerNight ?? 0),
-        );
-      case 'Rating':
-        filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-    }
-    return filtered;
-  }
+  List<Room> get _filteredRooms => applyFilters(_rooms, _filters, searchQuery);
 
   Future<void> _debugRoomRowCount() async {
     try {
@@ -163,19 +105,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     });
     try {
       if (refresh) ref.invalidate(roomsProvider);
-      final results = await Future.wait([
-        _service.fetchCategories(),
-        ref.read(roomsProvider.future),
-      ]);
-      final user = FirebaseAuth.instance.currentUser;
-      final favorites = user == null
-          ? <String>{}
-          : await _service.fetchFavoriteIds(user.uid);
+      final rooms = await ref.read(roomsProvider.future);
       if (!mounted) return;
       setState(() {
-        _categories = results[0] as List<String>;
-        _rooms = results[1] as List<Room>;
-        _favorites = favorites;
+        _rooms = rooms;
         _error = null;
         _debugError = null;
         _loading = false;
@@ -193,75 +126,29 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     }
   }
 
-  Future<void> _favorite(Room room) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in to save your favorite rooms.'),
-        ),
-      );
-      return;
-    }
-
-    final wasFavorite = _favorites.contains(room.id);
-    setState(() {
-      if (wasFavorite) {
-        _favorites.remove(room.id);
-      } else {
-        _favorites.add(room.id);
-      }
-    });
-
-    try {
-      await _service.toggleFavorite(user.uid, room.id, isFavorite: wasFavorite);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (wasFavorite) {
-          _favorites.add(room.id);
-        } else {
-          _favorites.remove(room.id);
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not update favorite.')),
-      );
-    }
-  }
-
-  void _apply(String selection) {
-    final parts = selection.split('=');
-    if (parts.length != 2) return;
-
-    setState(() {
-      switch (parts[0]) {
-        case 'Price Range':
-          _price = parts[1] == 'Any' ? null : parts[1];
-        case 'Capacity':
-          _capacity = parts[1] == 'Any' ? null : parts[1];
-        case 'Room Type':
-          _category = parts[1] == 'Any' ? 'All' : parts[1];
-        case 'Amenities':
-          if (_amenities.contains(parts[1])) {
-            _amenities.remove(parts[1]);
-          } else {
-            _amenities.add(parts[1]);
-          }
-      }
-    });
-    _load();
-  }
-
   void _clear() {
-    setState(() {
-      _price = null;
-      _capacity = null;
-      _category = 'All';
-      _amenities.clear();
-    });
-    _load();
+    setState(() => _filters = _filters.clear());
   }
+
+  Future<void> _openFilters() async {
+    final result = await showRoomFilters(
+      context: context,
+      rooms: _rooms,
+      initial: _filters,
+      searchQuery: searchQuery,
+    );
+    if (result == null || !mounted) return;
+    setState(() => _filters = result);
+  }
+
+  void _removeType(String value) => setState(() {
+    _filters = _filters.copyWith(types: {..._filters.types}..remove(value));
+  });
+  void _removeAmenity(String value) => setState(() {
+    _filters = _filters.copyWith(
+      amenities: {..._filters.amenities}..remove(value),
+    );
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -328,24 +215,20 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                             12,
                           ),
                           child: RoomFilterBar(
-                            categories: _categories,
-                            category: _category,
-                            price: _price,
-                            type: _category == 'All' ? null : _category,
-                            capacity: _capacity,
-                            amenities: _amenities,
-                            onCategory: (category) {
-                              setState(() => _category = category);
-                              _load();
-                            },
-                            onFilter: _apply,
-                            onClear: _clear,
+                            isActive: _filters.isActive,
+                            activeCount: _filters.activeCount,
+                            onAll: _clear,
+                            onFilters: _openFilters,
                           ),
                         ),
                       ),
                       SliverToBoxAdapter(
                         child: _buildResultsRow(maxWidth, contentWidth),
                       ),
+                      if (_filters.isActive)
+                        SliverToBoxAdapter(
+                          child: _activeFilterChips(contentWidth),
+                        ),
                       if (_loading)
                         SliverToBoxAdapter(
                           child: _skeletonGrid(maxWidth, columns, contentWidth),
@@ -363,7 +246,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                             debugDetails: kDebugMode ? _debugError : null,
                           ),
                         )
-                      else if (applyFilters(_rooms).isEmpty)
+                      else if (_filteredRooms.isEmpty)
                         SliverToBoxAdapter(
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
@@ -375,7 +258,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                                     'Try changing or clearing your filters.',
                                     OutlinedButton(
                                       onPressed: _clear,
-                                      child: const Text('Clear filters'),
+                                      child: const Text('Clear Filters'),
                                     ),
                                   ),
                           ),
@@ -390,7 +273,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                               maxWidth,
                               contentWidth,
                               columns,
-                              applyFilters(_rooms),
+                              _filteredRooms,
                             ),
                           ),
                         ),
@@ -438,11 +321,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                searchQuery.isNotEmpty
-                    ? '${applyFilters(_rooms).length} Rooms found for "$searchQuery"'
-                    : maxWidth < 360
-                    ? '${applyFilters(_rooms).length} Rooms'
-                    : '${applyFilters(_rooms).length} Rooms Available',
+                _filters.isActive || searchQuery.isNotEmpty
+                    ? '${_filteredRooms.length} Rooms found'
+                    : '${_filteredRooms.length} Rooms Available',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -452,52 +333,66 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isDense: true,
-                  isExpanded: true,
-                  value: _sort,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: AppColors.navy,
-                  ),
-                  selectedItemBuilder: (context) => const [
-                    _SortLabel('Recommended'),
-                    _SortLabel('Price ↑'),
-                    _SortLabel('Price ↓'),
-                    _SortLabel('Rating'),
-                  ],
-                  items:
-                      [
-                        'Recommended',
-                        'Price Low to High',
-                        'Price High to Low',
-                        'Rating',
-                      ].map((sort) {
-                        return DropdownMenuItem(
-                          value: sort,
-                          child: Text(
-                            sort,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                  onChanged: (sort) {
-                    if (sort == null) return;
-                    setState(() => _sort = sort);
-                    _load();
-                  },
-                ),
-              ),
-            ),
           ],
         ),
       ),
     ),
+  );
+
+  Widget _activeFilterChips(double maxWidth) {
+    final chips = <Widget>[
+      for (final type in _filters.types)
+        _removableChip(type, () => _removeType(type)),
+      if (_filters.price case final range?)
+        _removableChip(
+          '₹${range.start.round()}-₹${range.end.round()}',
+          () => setState(() => _filters = _filters.copyWith(clearPrice: true)),
+        ),
+      if (_filters.guests case final guests?)
+        _removableChip(
+          '$guests+ guests',
+          () => setState(() => _filters = _filters.copyWith(clearGuests: true)),
+        ),
+      for (final amenity in _filters.amenities)
+        _removableChip(amenity, () => _removeAmenity(amenity)),
+      if (_filters.sort != SortOption.recommended)
+        _removableChip(
+          switch (_filters.sort) {
+            SortOption.priceLowHigh => 'Price low-high',
+            SortOption.priceHighLow => 'Price high-low',
+            SortOption.rating => 'Rating',
+            SortOption.recommended => 'Recommended',
+          },
+          () => setState(
+            () => _filters = _filters.copyWith(sort: SortOption.recommended),
+          ),
+        ),
+    ];
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: SizedBox(
+          height: 44,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: chips.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
+            itemBuilder: (_, index) => chips[index],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _removableChip(String label, VoidCallback onRemove) => InputChip(
+    label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    onDeleted: onRemove,
+    deleteIcon: const Icon(Icons.close_rounded, size: 16),
+    backgroundColor: AppColors.cream,
+    side: const BorderSide(color: AppColors.gold),
+    labelStyle: const TextStyle(color: AppColors.navy, fontSize: 12),
+    visualDensity: VisualDensity.compact,
   );
 
   Widget _buildRoomsGrid(
@@ -603,8 +498,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       child: RoomCard(
         key: ValueKey(room.id),
         room: room,
-        isFavorite: _favorites.contains(room.id),
-        onFavorite: () => _favorite(room),
         onDetails: () => openRoomDetails(
           context,
           room,
@@ -729,30 +622,4 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
     );
   }
-}
-
-class _SortLabel extends StatelessWidget {
-  const _SortLabel(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const Icon(Icons.sort, size: 15, color: AppColors.navy),
-      const SizedBox(width: 4),
-      Flexible(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    ],
-  );
 }
