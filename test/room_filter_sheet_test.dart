@@ -1,23 +1,16 @@
+import 'package:atithi/screens/rooms/models/room_filters.dart';
 import 'package:atithi/screens/rooms/widgets/room_filter_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('room types are deduplicated and alphabetically sorted', () {
-    expect(
-      RoomFilters.uniqueRoomTypes([
-        ' deluxe room ',
-        'Deluxe',
-        'Family Suite',
-        'Family',
-        'Standard Room',
-        'Executive',
-      ]),
-      ['Deluxe', 'Executive', 'Family', 'Standard Room'],
-    );
+  test('room filters count active selections', () {
+    const filters = RoomFilters(types: {'Deluxe'}, guests: 3);
+    expect(filters.isActive, isTrue);
+    expect(filters.activeCount, 2);
   });
 
-  testWidgets('filter sheet scrolls on a compact keyboard-inset viewport', (
+  testWidgets('room filter bar invokes the All callback', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -25,7 +18,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    RoomFilters? applied;
+    var allPressed = false;
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
@@ -37,12 +30,10 @@ void main() {
           child: Scaffold(
             body: Center(
               child: RoomFilterBar(
-                categories: const ['Deluxe', 'Family', 'Standard Room'],
-                category: 'All',
-                filters: RoomFilters(priceRanges: {'Under 4000'}),
-                onCategory: (_) {},
-                onApply: (value) => applied = value,
-                resultCount: (_) => 12,
+                isActive: true,
+                activeCount: 2,
+                onAll: () => allPressed = true,
+                onFilters: () {},
               ),
             ),
           ),
@@ -50,17 +41,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Filters'));
+    await tester.tap(find.text('All'));
     await tester.pumpAndSettle();
-    expect(find.text('Clear all'), findsOneWidget);
-    expect(find.text('1 filter'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text('Clear all'));
-    await tester.pumpAndSettle();
-    expect(applied?.isEmpty, isTrue);
-    expect(find.text('1 filter'), findsNothing);
-    expect(find.text('Show 12 rooms'), findsOneWidget);
+    expect(allPressed, isTrue);
     expect(tester.takeException(), isNull);
   });
 }

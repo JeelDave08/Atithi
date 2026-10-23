@@ -579,11 +579,11 @@ class BookingCard extends StatelessWidget {
                         ),
                         guestsRow,
                         if (adults + children >= maxGuests)
-                          const Align(
+                          Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               'Max $maxGuests guests per room',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: _secondaryText,
                                 fontSize: 11,
                               ),
