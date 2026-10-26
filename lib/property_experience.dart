@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'widgets/auto_slide_rooms.dart';
-
 import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,6 +25,7 @@ import 'navigation/room_navigation.dart';
 import 'core/navigation/app_shell.dart';
 import 'core/responsive/app_container.dart';
 import 'widgets/wishlist_button.dart';
+import 'widgets/room_image_slider.dart';
 
 const _experienceCream = AppColors.cream;
 const _experienceCard = AppColors.surface;
@@ -1599,166 +1598,819 @@ class _PropertyContactScreenState extends State<PropertyContactScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => _PropertyPage(
-    title: 'Contact Us',
-    activeRoute: '/contact',
-    child: FutureBuilder<PropertyContent?>(
-      future: _property,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _PageState(
-            message: 'We could not load contact information.',
-            diagnostic: _debugDataError(snapshot.error),
-            isError: true,
-            onRetry: () => setState(
-              () => _property = widget.repository.getActiveProperty(),
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 900;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    return AppShell(
+      activeRoute: '/contact',
+      wrapInContainer: false,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 32),
+                    const ContactHero(),
+                    const SizedBox(height: 32),
+                    FutureBuilder<PropertyContent?>(
+                      future: _property,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: _PageState(
+                              message: 'We could not load contact information.',
+                              diagnostic: _debugDataError(snapshot.error),
+                              isError: true,
+                              onRetry: () => setState(
+                                () => _property =
+                                    widget.repository.getActiveProperty(),
+                              ),
+                            ),
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 60),
+                            child: _PageLoading(),
+                          );
+                        }
+                        final property = snapshot.data;
+                        final phone = property?.contactPhone.isNotEmpty == true
+                            ? property!.contactPhone
+                            : '+91 90000 12345';
+                        final email = property?.contactEmail.isNotEmpty == true
+                            ? property!.contactEmail
+                            : 'demo@atithi.example';
+                        final address = property?.address.isNotEmpty == true
+                            ? property!.address
+                            : 'Kalawad Road, Rajkot, Gujarat, India';
+
+                        if (isDesktop) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  children: [
+                                    ContactInfoCard(
+                                      icon: Icons.phone_outlined,
+                                      title: 'Phone',
+                                      value: phone,
+                                      showTrailing: true,
+                                      onTap: () => _launchContact(
+                                        context,
+                                        Uri(scheme: 'tel', path: phone),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ContactInfoCard(
+                                      icon: Icons.email_outlined,
+                                      title: 'Email',
+                                      value: email,
+                                      showTrailing: true,
+                                      onTap: () => _launchContact(
+                                        context,
+                                        Uri(scheme: 'mailto', path: email),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ContactInfoCard(
+                                      icon: Icons.location_on_outlined,
+                                      title: 'Address',
+                                      value: address,
+                                      showTrailing: false,
+                                      onTap: () => _launchContact(
+                                        context,
+                                        Uri.parse(
+                                          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 32),
+                              Expanded(
+                                flex: 6,
+                                child: MessageFormCard(
+                                  formKey: _formKey,
+                                  nameController: _name,
+                                  emailController: _email,
+                                  phoneController: _phone,
+                                  subjectController: _subject,
+                                  messageController: _message,
+                                  submitting: _submitting,
+                                  onSubmit: _submit,
+                                  isDesktop: true,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ContactInfoCard(
+                              icon: Icons.phone_outlined,
+                              title: 'Phone',
+                              value: phone,
+                              showTrailing: true,
+                              onTap: () => _launchContact(
+                                context,
+                                Uri(scheme: 'tel', path: phone),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ContactInfoCard(
+                              icon: Icons.email_outlined,
+                              title: 'Email',
+                              value: email,
+                              showTrailing: true,
+                              onTap: () => _launchContact(
+                                context,
+                                Uri(scheme: 'mailto', path: email),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ContactInfoCard(
+                              icon: Icons.location_on_outlined,
+                              title: 'Address',
+                              value: address,
+                              showTrailing: false,
+                              onTap: () => _launchContact(
+                                context,
+                                Uri.parse(
+                                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            MessageFormCard(
+                              formKey: _formKey,
+                              nameController: _name,
+                              emailController: _email,
+                              phoneController: _phone,
+                              subjectController: _subject,
+                              messageController: _message,
+                              submitting: _submitting,
+                              onSubmit: _submit,
+                              isDesktop: false,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 64),
+                  ],
+                ),
+              ),
             ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const _PageLoading();
-        }
-        final property = snapshot.data;
-        if (property == null) {
-          return const _PageState(
-            message: 'Contact information is not available yet.',
-          );
-        }
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ContactHero extends StatelessWidget {
+  const ContactHero({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 900;
+    final heroHeight = isDesktop ? 180.0 : 140.0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: SizedBox(
+        height: heroHeight,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            _PropertyImage(url: null, height: 180),
-            const SizedBox(height: 20),
-            if (property.contactPhone.isEmpty &&
-                property.contactEmail.isEmpty &&
-                property.address.isEmpty)
-              const _InfoSection(
-                title: 'Contact information not available yet',
-                body:
-                    'Please check back later for the property contact details.',
-              ),
-            if (property.contactPhone.isNotEmpty)
-              _ContactDetail(
-                icon: Icons.phone_outlined,
-                title: 'Phone',
-                value: property.contactPhone,
-                onTap: () => _launchContact(
-                  context,
-                  Uri(scheme: 'tel', path: property.contactPhone),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_experienceNavy, Color(0xFF1B2A4A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-            if (property.contactEmail.isNotEmpty)
-              _ContactDetail(
-                icon: Icons.email_outlined,
-                title: 'Email',
-                value: property.contactEmail,
-                onTap: () => _launchContact(
-                  context,
-                  Uri(scheme: 'mailto', path: property.contactEmail),
+            ),
+            Image.asset(
+              'assets/images/heritage_hero_bg.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  const SizedBox.shrink(),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _experienceNavy.withValues(alpha: 0.90),
+                    _experienceNavy.withValues(alpha: 0.70),
+                    _experienceNavy.withValues(alpha: 0.85),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
               ),
-            if (property.address.isNotEmpty)
-              _ContactDetail(
-                icon: Icons.location_on_outlined,
-                title: 'Address',
-                value: property.address,
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 36 : 20,
+                vertical: isDesktop ? 24 : 18,
               ),
-            const SizedBox(height: 18),
-            const _SectionTitle('Send Us a Message'),
-            const SizedBox(height: 12),
-            Form(
-              key: _formKey,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ContactInput(
-                    controller: _name,
-                    label: 'Name',
-                    maxLength: 120,
-                    validator: (value) =>
-                        _requiredField(value, label: 'name', maxLength: 120),
-                  ),
-                  _ContactInput(
-                    controller: _email,
-                    label: 'Email',
-                    keyboardType: TextInputType.emailAddress,
-                    maxLength: 254,
-                    validator: (value) {
-                      final error = _validateEmail(value);
-                      if (error != null) return error;
-                      return value!.trim().length > 254
-                          ? 'Email address is too long.'
-                          : null;
-                    },
-                  ),
-                  _ContactInput(
-                    controller: _phone,
-                    label: 'Mobile Number',
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                    maxLength: 10,
-                    validator: (value) {
-                      final phone = value?.trim() ?? '';
-                      if (phone.isEmpty) {
-                        return 'Please enter your mobile number';
-                      }
-                      if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
-                        return 'Enter a valid 10-digit mobile number';
-                      }
-                      return null;
-                    },
-                  ),
-                  _ContactInput(
-                    controller: _subject,
-                    label: 'Subject',
-                    maxLength: 160,
-                    validator: (value) =>
-                        _requiredField(value, label: 'subject', maxLength: 160),
-                  ),
-                  _ContactInput(
-                    controller: _message,
-                    label: 'Message',
-                    maxLines: 4,
-                    maxLength: 5000,
-                    validator: (value) => _requiredField(
-                      value,
-                      label: 'message',
-                      maxLength: 5000,
+                  Text(
+                    'Contact Us',
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: isDesktop ? 40 : 30,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.1,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _submitting ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _experienceNavy,
-                        foregroundColor: _experienceCream,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                      ),
-                      child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: _experienceCream,
-                              ),
-                            )
-                          : const Text('Submit Message'),
+                  Container(
+                    width: 56,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: _experienceGold,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'View property contact details or send a message to the team.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.dmSans(
+                      fontSize: isDesktop ? 14 : 12.5,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      height: 1.4,
                     ),
                   ),
                 ],
               ),
             ),
           ],
-        );
-      },
-    ),
-  );
+        ),
+      ),
+    );
+  }
+}
+
+class ContactInfoCard extends StatefulWidget {
+  const ContactInfoCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    this.showTrailing = false,
+    this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final bool showTrailing;
+  final VoidCallback? onTap;
+
+  @override
+  State<ContactInfoCard> createState() => _ContactInfoCardState();
+}
+
+class _ContactInfoCardState extends State<ContactInfoCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 900;
+    final padding = isDesktop ? 20.0 : 18.0;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          transform: Matrix4.translationValues(0, _isHovered ? -2 : 0, 0),
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFDF8),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _isHovered
+                  ? _experienceGold
+                  : _experienceGold.withValues(alpha: 0.25),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _experienceNavy.withValues(alpha: _isHovered ? 0.10 : 0.06),
+                blurRadius: _isHovered ? 24 : 20,
+                offset: Offset(0, _isHovered ? 8 : 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFF3E7C6),
+                ),
+                child: Center(
+                  child: Icon(widget.icon, size: 20, color: _experienceGold),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _experienceNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.value,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        color: AppColors.secondaryText,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.showTrailing)
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isHovered
+                        ? _experienceGold.withValues(alpha: 0.2)
+                        : const Color(0xFFF3E7C6).withValues(alpha: 0.5),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 16,
+                      color: _experienceNavy,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MessageFormCard extends StatelessWidget {
+  const MessageFormCard({
+    required this.formKey,
+    required this.nameController,
+    required this.emailController,
+    required this.phoneController,
+    required this.subjectController,
+    required this.messageController,
+    required this.submitting,
+    required this.onSubmit,
+    required this.isDesktop,
+    super.key,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final TextEditingController nameController;
+  final TextEditingController emailController;
+  final TextEditingController phoneController;
+  final TextEditingController subjectController;
+  final TextEditingController messageController;
+  final bool submitting;
+  final VoidCallback onSubmit;
+  final bool isDesktop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 28 : 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFDF8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _experienceGold.withValues(alpha: 0.25),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _experienceNavy.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Send Us a Message',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: _experienceNavy,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Divider(
+              color: _experienceGold.withValues(alpha: 0.2),
+              height: 1,
+              thickness: 1,
+            ),
+            const SizedBox(height: 22),
+            if (isDesktop)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _ContactInputField(
+                      controller: nameController,
+                      label: 'Name',
+                      maxLength: 120,
+                      validator: (value) =>
+                          _requiredField(value, label: 'name', maxLength: 120),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _ContactInputField(
+                      controller: emailController,
+                      label: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      maxLength: 254,
+                      validator: (value) {
+                        final error = _validateEmail(value);
+                        if (error != null) return error;
+                        return value!.trim().length > 254
+                            ? 'Email address is too long.'
+                            : null;
+                      },
+                    ),
+                  ),
+                ],
+              )
+            else ...[
+              _ContactInputField(
+                controller: nameController,
+                label: 'Name',
+                maxLength: 120,
+                validator: (value) =>
+                    _requiredField(value, label: 'name', maxLength: 120),
+              ),
+              const SizedBox(height: 16),
+              _ContactInputField(
+                controller: emailController,
+                label: 'Email',
+                keyboardType: TextInputType.emailAddress,
+                maxLength: 254,
+                validator: (value) {
+                  final error = _validateEmail(value);
+                  if (error != null) return error;
+                  return value!.trim().length > 254
+                      ? 'Email address is too long.'
+                      : null;
+                },
+              ),
+            ],
+            const SizedBox(height: 16),
+            _ContactInputField(
+              controller: phoneController,
+              label: 'Mobile Number',
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              maxLength: 10,
+              validator: (value) {
+                final phone = value?.trim() ?? '';
+                if (phone.isEmpty) {
+                  return 'Please enter your mobile number';
+                }
+                if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+                  return 'Enter a valid 10-digit mobile number';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            _ContactInputField(
+              controller: subjectController,
+              label: 'Subject',
+              maxLength: 160,
+              validator: (value) =>
+                  _requiredField(value, label: 'subject', maxLength: 160),
+            ),
+            const SizedBox(height: 16),
+            _ContactInputField(
+              controller: messageController,
+              label: 'Message',
+              maxLines: 5,
+              minLines: 4,
+              maxLength: 5000,
+              showCounter: true,
+              validator: (value) =>
+                  _requiredField(value, label: 'message', maxLength: 5000),
+            ),
+            const SizedBox(height: 24),
+            _ContactSubmitButton(
+              submitting: submitting,
+              onPressed: onSubmit,
+              isDesktop: isDesktop,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactInputField extends StatefulWidget {
+  const _ContactInputField({
+    required this.controller,
+    required this.label,
+    required this.validator,
+    this.maxLength,
+    this.maxLines = 1,
+    this.minLines,
+    this.keyboardType,
+    this.textInputAction,
+    this.inputFormatters,
+    this.showCounter = false,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? Function(String?) validator;
+  final int? maxLength;
+  final int maxLines;
+  final int? minLines;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final List<TextInputFormatter>? inputFormatters;
+  final bool showCounter;
+
+  @override
+  State<_ContactInputField> createState() => _ContactInputFieldState();
+}
+
+class _ContactInputFieldState extends State<_ContactInputField> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() => _isFocused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: GoogleFonts.dmSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _experienceNavy,
+          ),
+        ),
+        const SizedBox(height: 7),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: _isFocused
+                ? [
+                    BoxShadow(
+                      color: _experienceGold.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: TextFormField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction ??
+                (widget.maxLines > 1
+                    ? TextInputAction.newline
+                    : TextInputAction.next),
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.maxLines,
+            minLines: widget.minLines,
+            maxLength: widget.maxLength,
+            validator: widget.validator,
+            style: GoogleFonts.dmSans(
+              fontSize: 14,
+              color: _experienceNavy,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFFBF6EC),
+              counterText: widget.showCounter ? null : '',
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: _experienceGold.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: _experienceGold.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: _experienceGold,
+                  width: 1.5,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Colors.redAccent,
+                  width: 1,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Colors.redAccent,
+                  width: 1.5,
+                ),
+              ),
+              errorStyle: GoogleFonts.dmSans(
+                fontSize: 12,
+                color: Colors.redAccent,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ContactSubmitButton extends StatefulWidget {
+  const _ContactSubmitButton({
+    required this.submitting,
+    required this.onPressed,
+    required this.isDesktop,
+  });
+
+  final bool submitting;
+  final VoidCallback onPressed;
+  final bool isDesktop;
+
+  @override
+  State<_ContactSubmitButton> createState() => _ContactSubmitButtonState();
+}
+
+class _ContactSubmitButtonState extends State<_ContactSubmitButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: widget.submitting
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        transform: Matrix4.translationValues(
+          0,
+          _isHovered && !widget.submitting ? -2 : 0,
+          0,
+        ),
+        height: 54,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(27),
+          boxShadow: [
+            BoxShadow(
+              color: _experienceNavy.withValues(alpha: _isHovered ? 0.25 : 0.15),
+              blurRadius: _isHovered ? 16 : 10,
+              offset: Offset(0, _isHovered ? 6 : 4),
+            ),
+          ],
+        ),
+        child: FilledButton(
+          onPressed: widget.submitting ? null : widget.onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: _experienceNavy,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(27),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+          ),
+          child: widget.submitting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Send Message',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.send_rounded,
+                      size: 16,
+                      color: _experienceGold,
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+
+    if (widget.isDesktop) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: SizedBox(width: 220, child: button),
+      );
+    }
+    return SizedBox(width: double.infinity, child: button);
+  }
 }
 
 class PropertyRoomsScreen extends StatefulWidget {
@@ -1850,20 +2502,22 @@ class _PropertyRoomsScreenState extends State<PropertyRoomsScreen> {
                         ),
                       ),
                     ),
-                  for (final room in rooms)
+                  for (var i = 0; i < rooms.length; i++)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: _RoomCard(
+                        key: ValueKey(rooms[i].id),
+                        roomIndex: i,
                         room: Room(
-                          id: room.id,
-                          roomName: room.name,
-                          roomType: room.type,
-                          description: room.description,
-                          pricePerNight: room.pricePerNight.toDouble(),
-                          capacity: room.capacity,
-                          amenities: room.amenities,
-                          imageUrls: room.imageUrls,
-                          status: room.availability,
+                          id: rooms[i].id,
+                          roomName: rooms[i].name,
+                          roomType: rooms[i].type,
+                          description: rooms[i].description,
+                          pricePerNight: rooms[i].pricePerNight.toDouble(),
+                          capacity: rooms[i].capacity,
+                          amenities: rooms[i].amenities,
+                          imageUrls: rooms[i].imageUrls,
+                          status: rooms[i].availability,
                         ),
                       ),
                     ),
@@ -1918,7 +2572,11 @@ class PropertyRoomDetailsScreen extends StatelessWidget {
     child: ListView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
       children: [
-        _RoomImageCarousel(imageUrls: room.imageUrls, height: 270),
+        RoomImageSlider(
+          imageUrls: room.imageUrls,
+          height: 270,
+          borderRadius: BorderRadius.circular(20),
+        ),
         const SizedBox(height: 20),
         Text(
           room.name,
@@ -2323,10 +2981,91 @@ class _ResponsiveHomeRooms extends StatefulWidget {
 }
 
 class _ResponsiveHomeRoomsState extends State<_ResponsiveHomeRooms> {
-  final PageController _controller = PageController();
+  late PageController _controller;
+  double _viewportFraction = 1;
+  Timer? _timer;
+  Timer? _resumeTimer;
+  bool _hovering = false;
+  int _activePointers = 0;
+
+  int get _initialPage => widget.rooms.length * 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(initialPage: _initialPage);
+    _startAutoSlide();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final width = MediaQuery.sizeOf(context).width;
+    final fraction = width >= 1000
+        ? 1 / 3
+        : width >= 600
+        ? 1 / 2
+        : 1.0;
+    if (fraction == _viewportFraction) return;
+
+    final page = _controller.hasClients
+        ? _controller.page?.round() ?? _initialPage
+        : _initialPage;
+    _controller.dispose();
+    _viewportFraction = fraction;
+    _controller = PageController(viewportFraction: fraction, initialPage: page);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ResponsiveHomeRooms oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rooms.length != widget.rooms.length) {
+      _startAutoSlide();
+    }
+  }
+
+  void _startAutoSlide() {
+    _timer?.cancel();
+    _resumeTimer?.cancel();
+    _timer = null;
+    _resumeTimer = null;
+    if (widget.rooms.length < 2 || _hovering || _activePointers > 0) return;
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  void _pauseAutoSlide() {
+    _timer?.cancel();
+    _timer = null;
+    _resumeTimer?.cancel();
+    _resumeTimer = null;
+  }
+
+  void _resumeAutoSlideAfterDelay() {
+    if (_hovering || _activePointers > 0 || widget.rooms.length < 2) return;
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(const Duration(seconds: 3), _startAutoSlide);
+  }
+
+  void _onPointerDown(PointerDownEvent _) {
+    _activePointers++;
+    _pauseAutoSlide();
+  }
+
+  void _onPointerUp(PointerEvent _) {
+    if (_activePointers > 0) _activePointers--;
+    _resumeAutoSlideAfterDelay();
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
+    _resumeTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -2336,71 +3075,68 @@ class _ResponsiveHomeRoomsState extends State<_ResponsiveHomeRooms> {
     builder: (context, constraints) {
       const cardHeight = 520.0;
       final width = constraints.maxWidth;
-      if (width < 600) {
-        // Use AutoSlideRooms for seamless forward-only infinite auto-slide.
-        return AutoSlideRooms(
-          itemCount: widget.rooms.length,
-          height: cardHeight,
-          itemBuilder: (context, index) => RevealOnScroll(
-            key: ValueKey(widget.rooms[index].id),
-            delay: Duration(milliseconds: (index.clamp(0, 6)) * 120),
-            child: _RoomCard(room: widget.rooms[index]),
-          ),
-        );
-      }
-
-      final columns = width < 1024 ? 2 : 3;
-      final pageCount = (widget.rooms.length / columns).ceil();
+      final imageHeight = width * _viewportFraction * 10 / 16;
       return SizedBox(
         height: cardHeight,
-        child: Stack(
-          children: [
-            PageView.builder(
-              controller: _controller,
-              itemCount: pageCount,
-              itemBuilder: (context, page) => Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var column = 0; column < columns; column++) ...[
-                    if (column > 0) const SizedBox(width: 14),
-                    Expanded(
-                      child: page * columns + column >= widget.rooms.length
-                          ? const SizedBox.shrink()
-                          : _RoomCard(
-                              room: widget.rooms[page * columns + column],
-                            ),
+        child: MouseRegion(
+          onEnter: (_) {
+            _hovering = true;
+            _pauseAutoSlide();
+          },
+          onExit: (_) {
+            _hovering = false;
+            _resumeAutoSlideAfterDelay();
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Listener(
+                onPointerDown: _onPointerDown,
+                onPointerUp: _onPointerUp,
+                onPointerCancel: _onPointerUp,
+                child: PageView.builder(
+                  controller: _controller,
+                  padEnds: false,
+                  itemBuilder: (context, index) {
+                    final roomIndex = index % widget.rooms.length;
+                    final room = widget.rooms[roomIndex];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: _RoomCard(
+                        key: ValueKey(room.id),
+                        room: room,
+                        roomIndex: roomIndex,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (width >= 600 && widget.rooms.length > 1) ...[
+                Positioned(
+                  left: -8,
+                  top: imageHeight / 2 - 22,
+                  child: _RoomGalleryArrow(
+                    icon: Icons.chevron_left_rounded,
+                    onPressed: () => _controller.previousPage(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
                     ),
-                  ],
-                ],
-              ),
-            ),
-            if (width >= 1024 && pageCount > 1) ...[
-              Positioned(
-                left: 8,
-                top: 0,
-                bottom: 0,
-                child: _RoomGalleryArrow(
-                  icon: Icons.chevron_left_rounded,
-                  onPressed: () => _controller.previousPage(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOut,
                   ),
                 ),
-              ),
-              Positioned(
-                right: 8,
-                top: 0,
-                bottom: 0,
-                child: _RoomGalleryArrow(
-                  icon: Icons.chevron_right_rounded,
-                  onPressed: () => _controller.nextPage(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOut,
+                Positioned(
+                  right: -8,
+                  top: imageHeight / 2 - 22,
+                  child: _RoomGalleryArrow(
+                    icon: Icons.chevron_right_rounded,
+                    onPressed: () => _controller.nextPage(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       );
     },
@@ -2413,16 +3149,32 @@ class _RoomGalleryArrow extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(
+      shape: BoxShape.circle,
+      boxShadow: [
+        BoxShadow(
+          color: Color(0x40000000),
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
     child: Material(
-      color: AppColors.navy.withValues(alpha: .86),
+      color: AppColors.navy,
       shape: const CircleBorder(),
-      child: IconButton(
-        tooltip: icon == Icons.chevron_left_rounded
-            ? 'Previous rooms'
-            : 'Next rooms',
-        onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.gold),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+          tooltip: icon == Icons.chevron_left_rounded
+              ? 'Previous rooms'
+              : 'Next rooms',
+          onPressed: onPressed,
+          icon: Icon(icon, color: AppColors.gold),
+        ),
       ),
     ),
   );
@@ -2711,8 +3463,13 @@ class _RetryableSectionState<T> extends State<_RetryableSection<T>> {
 }
 
 class _RoomCard extends StatelessWidget {
-  const _RoomCard({required this.room});
+  const _RoomCard({
+    required this.room,
+    this.roomIndex = 0,
+    super.key,
+  });
   final Room room;
+  final int roomIndex;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -2733,9 +3490,13 @@ class _RoomCard extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final imageHeight = constraints.maxWidth * 10 / 16;
-                  return _RoomImageCarousel(
+                  return RoomImageSlider(
                     imageUrls: room.imageUrls,
                     height: imageHeight,
+                    roomIndex: roomIndex,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   );
                 },
               ),
@@ -2960,130 +3721,6 @@ class _PropertyAmenityChip extends StatelessWidget {
   }
 }
 
-class _RoomImageCarousel extends StatefulWidget {
-  const _RoomImageCarousel({required this.imageUrls, required this.height});
-  final List<String> imageUrls;
-  final double height;
-
-  @override
-  State<_RoomImageCarousel> createState() => _RoomImageCarouselState();
-}
-
-class _RoomImageCarouselState extends State<_RoomImageCarousel> {
-  late final PageController _controller;
-  Timer? _timer;
-  int _page = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = PageController();
-    _startAutoScroll();
-  }
-
-  @override
-  void didUpdateWidget(covariant _RoomImageCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrls.length != widget.imageUrls.length) {
-      _page = 0;
-      _controller.jumpToPage(0);
-      _startAutoScroll();
-    }
-  }
-
-  void _startAutoScroll() {
-    _timer?.cancel();
-    if (widget.imageUrls.length < 2) {
-      _timer = null;
-      return;
-    }
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_controller.hasClients) return;
-      final next = (_page + 1) % widget.imageUrls.length;
-      _controller.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
-  void _pauseForInteraction() {
-    _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 3), _startAutoScroll);
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _timer?.cancel();
-      _timer = null;
-    } else if (_timer == null && widget.imageUrls.length > 1) {
-      _startAutoScroll();
-    }
-    if (widget.imageUrls.isEmpty) {
-      return SizedBox(
-        height: widget.height,
-        child: const _PropertyImage(url: null, height: 200),
-      );
-    }
-    return SizedBox(
-      height: widget.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Listener(
-            onPointerDown: (_) => _timer?.cancel(),
-            onPointerUp: (_) => _pauseForInteraction(),
-            onPointerCancel: (_) => _pauseForInteraction(),
-            child: PageView.builder(
-              controller: _controller,
-              itemCount: widget.imageUrls.length,
-              onPageChanged: (index) {
-                setState(() => _page = index);
-              },
-              itemBuilder: (context, index) => _PropertyImage(
-                url: widget.imageUrls[index],
-                height: widget.height,
-              ),
-            ),
-          ),
-          if (widget.imageUrls.length > 1)
-            Positioned(
-              bottom: 10,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var index = 0; index < widget.imageUrls.length; index++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: index == _page ? 16 : 6,
-                      height: 6,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: index == _page
-                            ? _experienceLightGold
-                            : Colors.white70,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 class _PropertyPage extends StatelessWidget {
   const _PropertyPage({
@@ -3123,21 +3760,6 @@ class _PropertyPage extends StatelessWidget {
   }
 }
 
-class _PropertyImage extends StatelessWidget {
-  const _PropertyImage({required this.url, required this.height});
-  final String? url;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(22),
-    child: SizedBox(
-      height: height,
-      width: double.infinity,
-      child: AppNetworkImage(url: url),
-    ),
-  );
-}
 
 class _PageLoading extends StatelessWidget {
   const _PageLoading();
@@ -3318,32 +3940,6 @@ class _AnimatedSectionState extends State<_AnimatedSection>
         ),
       );
     },
-  );
-}
-
-class _InfoSection extends StatelessWidget {
-  const _InfoSection({required this.title, required this.body});
-  final String title;
-  final String body;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: _experienceCard,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: _experienceLightGold.withValues(alpha: .7)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle(title),
-        const SizedBox(height: 8),
-        Text(
-          body,
-          style: const TextStyle(color: AppColors.secondaryText, height: 1.55),
-        ),
-      ],
-    ),
   );
 }
 
@@ -3605,94 +4201,6 @@ IconData serviceIcon(String name) {
   return Icons.star_rounded;
 }
 
-class _ContactDetail extends StatelessWidget {
-  const _ContactDetail({
-    required this.icon,
-    required this.title,
-    required this.value,
-    this.onTap,
-  });
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    color: _experienceCard,
-    child: ListTile(
-      onTap: onTap,
-      leading: Icon(icon, color: _experienceGold),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: _experienceNavy,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      subtitle: Text(
-        value,
-        style: const TextStyle(color: AppColors.secondaryText),
-      ),
-      trailing: onTap == null
-          ? null
-          : const Icon(Icons.open_in_new, size: 17, color: _experienceNavy),
-    ),
-  );
-}
-
-class _ContactInput extends StatelessWidget {
-  const _ContactInput({
-    required this.controller,
-    required this.label,
-    required this.validator,
-    required this.maxLength,
-    this.keyboardType,
-    this.textInputAction,
-    this.inputFormatters,
-    this.maxLines = 1,
-  });
-  final TextEditingController controller;
-  final String label;
-  final String? Function(String?) validator;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final List<TextInputFormatter>? inputFormatters;
-  final int maxLines;
-  final int maxLength;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      inputFormatters: inputFormatters,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: _experienceCard,
-        counterText: '',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: _experienceLightGold),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: _experienceLightGold),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: _experienceGold, width: 1.5),
-        ),
-      ),
-    ),
-  );
-}
 
 String? _validateEmail(String? value) {
   final email = value?.trim() ?? '';

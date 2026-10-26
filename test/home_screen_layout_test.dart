@@ -15,7 +15,14 @@ void main() {
       publishableKey: 'test',
     );
   });
-  for (final size in const [Size(360, 800), Size(1440, 1000)]) {
+  for (final size in const [
+    Size(360, 800),
+    Size(899, 1000),
+    Size(900, 1000),
+    Size(1280, 1000),
+    Size(1440, 1000),
+    Size(1920, 1080),
+  ]) {
     testWidgets('Home layout has no overflow at $size', (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = size;
@@ -36,7 +43,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('ATITHI'), findsOneWidget);
+      if (size.width < 600 || size.width >= 1024) {
+        expect(find.text('ATITHI'), findsOneWidget);
+      }
       expect(find.text('More than\njust a stay'), findsOneWidget);
       expect(find.text('Find a stay'), findsOneWidget);
       expect(tester.takeException(), isNull);
