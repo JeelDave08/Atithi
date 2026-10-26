@@ -34,7 +34,7 @@ class AppShell extends StatelessWidget {
     final content = wrapInContainer
         ? AppContainer(backgroundColor: backgroundColor, child: body)
         : body;
-    final desktop = context.screenWidth >= 600;
+    final desktop = context.isDesktop;
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Column(
@@ -230,6 +230,9 @@ class _MobileNavigation extends StatelessWidget {
                           const SizedBox(height: 3),
                           Text(
                             item.$1,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11.5,
                               color: activeRoute == item.$2

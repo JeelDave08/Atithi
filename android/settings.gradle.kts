@@ -12,8 +12,34 @@ pluginManagement {
 
     repositories {
         google()
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
         mavenCentral()
         gradlePluginPortal()
+    }
+}
+
+gradle.allprojects {
+    buildscript.repositories.all {
+        if (this is MavenArtifactRepository) {
+            val u = url.toString()
+            if (u.contains("repo.maven.apache.org") || u.contains("repo1.maven.org")) {
+                setUrl("https://maven.aliyun.com/repository/public")
+            }
+        }
+    }
+    buildscript.repositories {
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+    }
+    repositories.all {
+        if (this is MavenArtifactRepository) {
+            val u = url.toString()
+            if (u.contains("repo.maven.apache.org") || u.contains("repo1.maven.org")) {
+                setUrl("https://maven.aliyun.com/repository/public")
+            }
+        }
+    }
+    repositories {
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 

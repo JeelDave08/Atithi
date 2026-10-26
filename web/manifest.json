@@ -1,12 +1,12 @@
 {
-    "name": "atithi",
-    "short_name": "atithi",
+    "name": "Atithi",
+    "short_name": "Atithi",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F8F2E5",
+    "theme_color": "#10284B",
+    "description": "Atithi. Better Stays. Happier Guests.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

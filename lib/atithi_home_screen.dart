@@ -518,7 +518,9 @@ class BookingCard extends StatelessWidget {
           ],
         );
         final searchButton = SizedBox(
-          width: compact ? double.infinity : 160,
+          width: compact
+              ? double.infinity
+              : 212 * MediaQuery.textScalerOf(context).scale(16) / 16,
           height: 56,
           child: Material(
             color: _navy,

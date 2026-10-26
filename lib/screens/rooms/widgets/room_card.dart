@@ -109,8 +109,10 @@ class RoomCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Line 1: Room Number & Category Badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       _displayRoomTitle,
@@ -120,7 +122,6 @@ class RoomCard extends StatelessWidget {
                         color: AppColors.navy,
                       ),
                     ),
-                    const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -132,6 +133,8 @@ class RoomCard extends StatelessWidget {
                       ),
                       child: Text(
                         _displayRoomType,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFFA67C24),
                           fontSize: 11.5,
@@ -160,12 +163,16 @@ class RoomCard extends StatelessWidget {
                           color: Color(0xFF4A5568),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          '${room.capacity ?? 2} Guests',
-                          style: const TextStyle(
-                            color: Color(0xFF4A5568),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            '${room.capacity ?? 2} Guests',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF4A5568),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
@@ -181,12 +188,16 @@ class RoomCard extends StatelessWidget {
                           color: Color(0xFF4A5568),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          _displayBedInfo,
-                          style: const TextStyle(
-                            color: Color(0xFF4A5568),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            _displayBedInfo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF4A5568),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
@@ -202,12 +213,16 @@ class RoomCard extends StatelessWidget {
                           color: Color(0xFF4A5568),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          _displaySize,
-                          style: const TextStyle(
-                            color: Color(0xFF4A5568),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            _displaySize,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF4A5568),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
